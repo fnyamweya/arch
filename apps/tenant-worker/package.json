@@ -1,0 +1,20 @@
+{
+  "name": "@arch/tenant-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome check src"
+  },
+  "dependencies": {
+    "@arch/cloudflare-bindings": "workspace:*",
+    "@arch/db-schema": "workspace:*",
+    "@arch/infrastructure-sdk": "workspace:*",
+    "drizzle-orm": "^0.39.0",
+    "hono": "^4.7.0"
+  }
+}

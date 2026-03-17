@@ -1,0 +1,9 @@
+export const USER_ROLE = {
+  PLATFORM_ADMIN: "PLATFORM_ADMIN",
+  TENANT_ADMIN: "TENANT_ADMIN",
+  VENDOR_OWNER: "VENDOR_OWNER",
+  VENDOR_STAFF: "VENDOR_STAFF",
+  CUSTOMER: "CUSTOMER"
+} as const;
+
+export type UserRole = (typeof USER_ROLE)[keyof typeof USER_ROLE];

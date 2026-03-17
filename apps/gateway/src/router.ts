@@ -1,0 +1,34 @@
+import { Hono } from "hono";
+import type { GatewayBindings } from "@arch/cloudflare-bindings";
+import type { GatewayVariables } from "./types";
+import { adminRoutes } from "./routes/admin.routes";
+import { authRoutes } from "./routes/auth.routes";
+import { catalogRoutes } from "./routes/catalog.routes";
+import { ledgerRoutes } from "./routes/ledger.routes";
+import { orderRoutes } from "./routes/order.routes";
+import { storefrontRoutes } from "./routes/storefront.routes";
+import { vendorRoutes } from "./routes/vendor.routes";
+import { clerkAuthGuard } from "./middleware/clerk-auth-guard";
+import { corsHandler } from "./middleware/cors-handler";
+import { rateLimiter } from "./middleware/rate-limiter";
+import { requestLogger } from "./middleware/request-logger";
+import { sentryMiddleware } from "./middleware/sentry-middleware";
+import { tenantResolver } from "./middleware/tenant-resolver";
+
+export const createGatewayRouter = (): Hono<{ Bindings: GatewayBindings; Variables: GatewayVariables }> => {
+  const router = new Hono<{ Bindings: GatewayBindings; Variables: GatewayVariables }>();
+  router.use("*", requestLogger, corsHandler, tenantResolver, rateLimiter, sentryMiddleware);
+  router.use("/catalog/*", clerkAuthGuard);
+  router.use("/orders/*", clerkAuthGuard);
+  router.use("/vendors/*", clerkAuthGuard);
+  router.use("/admin/*", clerkAuthGuard);
+  router.use("/ledger/*", clerkAuthGuard);
+  router.route("/auth", authRoutes);
+  router.route("/catalog", catalogRoutes);
+  router.route("/orders", orderRoutes);
+  router.route("/vendors", vendorRoutes);
+  router.route("/admin", adminRoutes);
+  router.route("/ledger", ledgerRoutes);
+  router.route("/storefront", storefrontRoutes);
+  return router;
+};

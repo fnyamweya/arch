@@ -1,0 +1,51 @@
+{
+  "name": "arch-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-17",
+  "d1_databases": [
+    {
+      "binding": "PLATFORM_DB",
+      "database_name": "arch-platform-global",
+      "database_id": "platform-d1-id"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "PLATFORM_CONFIG_KV",
+      "id": "platform-config-kv-id"
+    }
+  ],
+  "services": [
+    {
+      "binding": "RATE_LIMITER_WORKER",
+      "service": "arch-rate-limiter-durable-object"
+    },
+    {
+      "binding": "AUTH_WORKER",
+      "service": "arch-auth-worker"
+    },
+    {
+      "binding": "CATALOG_WORKER",
+      "service": "arch-catalog-worker"
+    },
+    {
+      "binding": "ORDER_WORKER",
+      "service": "arch-order-worker"
+    },
+    {
+      "binding": "VENDOR_WORKER",
+      "service": "arch-vendor-worker"
+    },
+    {
+      "binding": "TENANT_WORKER",
+      "service": "arch-tenant-worker"
+    },
+    {
+      "binding": "LEDGER_WORKER",
+      "service": "arch-ledger-worker"
+    }
+  ],
+  "vars": {
+    "PLATFORM_SENTRY_DSN": "https://example@sentry.io/1"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "arch-inventory-durable-object",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-17",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "INVENTORY_LOCK",
+        "class_name": "InventoryLockDurableObject"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["InventoryLockDurableObject"]
+    }
+  ]
+}

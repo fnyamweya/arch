@@ -1,0 +1,19 @@
+{
+  "name": "arch-rate-limiter-durable-object",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-17",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RATE_LIMITER",
+        "class_name": "RateLimiterDurableObject"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["RateLimiterDurableObject"]
+    }
+  ]
+}

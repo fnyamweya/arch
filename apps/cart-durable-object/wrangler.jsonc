@@ -1,0 +1,19 @@
+{
+  "name": "arch-cart-durable-object",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-17",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CART",
+        "class_name": "CartDurableObject"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["CartDurableObject"]
+    }
+  ]
+}

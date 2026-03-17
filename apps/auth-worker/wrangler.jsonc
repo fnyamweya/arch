@@ -1,0 +1,22 @@
+{
+  "name": "arch-auth-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-17",
+  "d1_databases": [
+    {
+      "binding": "PLATFORM_DB",
+      "database_name": "arch-platform-global",
+      "database_id": "platform-d1-id"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "PLATFORM_CONFIG_KV",
+      "id": "platform-config-kv-id"
+    }
+  ],
+  "vars": {
+    "PLATFORM_SENTRY_DSN": "https://example@sentry.io/1",
+    "CLERK_KEY_ENCRYPTION_SECRET": "replace-with-secret"
+  }
+}

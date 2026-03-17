@@ -1,0 +1,23 @@
+{
+  "name": "arch-tenant-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-17",
+  "d1_databases": [
+    {
+      "binding": "PLATFORM_DB",
+      "database_name": "arch-platform-global",
+      "database_id": "platform-d1-id"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "PLATFORM_CONFIG_KV",
+      "id": "platform-config-kv-id"
+    }
+  ],
+  "vars": {
+    "CLOUDFLARE_ACCOUNT_ID": "replace-account-id",
+    "CLOUDFLARE_API_TOKEN": "replace-api-token",
+    "PLATFORM_SENTRY_DSN": "https://example@sentry.io/1"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "arch-vendor-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-17",
+  "d1_databases": [
+    {
+      "binding": "TENANT_DB",
+      "database_name": "arch-tenant-default",
+      "database_id": "tenant-d1-id"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "TENANT_KV",
+      "id": "tenant-kv-id"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "TENANT_EVENTS_QUEUE",
+        "queue": "arch-tenant-default-events"
+      }
+    ]
+  },
+  "vars": {
+    "PLATFORM_SENTRY_DSN": "https://example@sentry.io/1"
+  }
+}
