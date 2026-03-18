@@ -1,3 +1,6 @@
-export default function VendorProductsPage(): JSX.Element {
-  return <main>Vendor Products</main>;
+import { DashboardTablePageTemplate } from "@arch/ui-kit";
+import { vendorProductsPage } from "../../../features/dashboard/page-data";
+
+export default function VendorProductsPage() {
+  return <DashboardTablePageTemplate {...vendorProductsPage} />;
 }

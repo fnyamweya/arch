@@ -1,0 +1,30 @@
+{
+  "name": "@arch/storefront-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome check src"
+  },
+  "dependencies": {
+    "@arch/shared-kernel": "workspace:*",
+    "@arch/storefront-core": "workspace:*",
+    "@arch/storefront-validation": "workspace:*",
+    "@arch/storefront-api-contracts": "workspace:*",
+    "@arch/storefront-theme": "workspace:*",
+    "@arch/storefront-layout": "workspace:*",
+    "@arch/storefront-blocks": "workspace:*",
+    "@arch/storefront-content": "workspace:*",
+    "@arch/storefront-routing": "workspace:*",
+    "@arch/storefront-seo": "workspace:*",
+    "@arch/storefront-admin": "workspace:*",
+    "hono": "^4.7.0",
+    "@hono/zod-openapi": "^1.2.2",
+    "@hono/swagger-ui": "^0.6.1",
+    "zod": "^4.3.6"
+  }
+}

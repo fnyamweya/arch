@@ -52,6 +52,29 @@ const decodeTokenPayload = (token: string): AuthTokenPayload | null => {
   }
 };
 
+const normalizeOptionalUrl = (value: string | null | undefined): string | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const normalizedValue = value.trim();
+  if (normalizedValue.length === 0) {
+    return null;
+  }
+  return normalizedValue.endsWith("/") ? normalizedValue.slice(0, -1) : normalizedValue;
+};
+
+const resolveJwksUrl = (authDomain: string | null, explicitJwksUrl: string | null): string | null => {
+  const normalizedJwksUrl = normalizeOptionalUrl(explicitJwksUrl);
+  if (normalizedJwksUrl !== null) {
+    return normalizedJwksUrl;
+  }
+  const normalizedAuthDomain = normalizeOptionalUrl(authDomain);
+  if (normalizedAuthDomain === null) {
+    return null;
+  }
+  return `${normalizedAuthDomain}/.well-known/jwks.json`;
+};
+
 app.post("/internal/verify-token", async (c) => {
   const body = (await c.req.json()) as {
     readonly token?: string;
@@ -212,30 +235,79 @@ app.get("/internal/tenants/:tenantId/clerk-config", async (c) => {
 });
 
 app.post("/internal/tenants/:tenantId/configure-clerk-keys", async (c) => {
+  const tenantId = c.req.param("tenantId");
   const body = (await c.req.json()) as {
     readonly clerkPublishableKey: string;
-    readonly clerkSecretKey: string;
-    readonly clerkWebhookSecret: string;
+    readonly clerkSecretKey?: string;
+    readonly clerkWebhookSecret?: string;
+    readonly clerkAuthDomain?: string | null;
+    readonly clerkProxyUrl?: string | null;
+    readonly clerkJwksUrl?: string | null;
   };
-  const result = await configureTenantClerkKeys({
-    tenantId: c.req.param("tenantId"),
-    clerkPublishableKey: body.clerkPublishableKey,
-    clerkSecretKey: body.clerkSecretKey,
-    clerkWebhookSecret: body.clerkWebhookSecret,
-    encryptionSecret: c.env.CLERK_KEY_ENCRYPTION_SECRET
-  });
   const repository = new D1ClerkConfigRepository(c.env.PLATFORM_DB);
+  const existingConfig = await repository.getByTenantId(tenantId);
+  const normalizedSecretKey = body.clerkSecretKey?.trim() ?? "";
+  const normalizedWebhookSecret = body.clerkWebhookSecret?.trim() ?? "";
+  const encryptedSecretKey =
+    normalizedSecretKey.length > 0
+      ? (
+        await configureTenantClerkKeys({
+          tenantId,
+          clerkPublishableKey: body.clerkPublishableKey,
+          clerkSecretKey: normalizedSecretKey,
+          clerkWebhookSecret: normalizedWebhookSecret.length > 0 ? normalizedWebhookSecret : existingConfig?.webhookSecret ?? "",
+          encryptionSecret: c.env.CLERK_KEY_ENCRYPTION_SECRET
+        })
+      ).encryptedSecretKey
+      : existingConfig?.encryptedSecretKey;
+  const webhookSecret =
+    normalizedWebhookSecret.length > 0 ? normalizedWebhookSecret : (existingConfig?.webhookSecret ?? null);
+  if (encryptedSecretKey === undefined || webhookSecret === null) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "MISSING_SECRET_CONFIGURATION",
+          message: "Clerk secret key and webhook secret are required for initial configuration"
+        }
+      },
+      400
+    );
+  }
+  const authDomain = normalizeOptionalUrl(body.clerkAuthDomain ?? existingConfig?.authDomain ?? null);
+  const proxyUrl = normalizeOptionalUrl(body.clerkProxyUrl ?? existingConfig?.proxyUrl ?? null);
+  const jwksUrl = resolveJwksUrl(authDomain, body.clerkJwksUrl ?? existingConfig?.jwksUrl ?? null);
+  if (jwksUrl === null) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "JWKS_URL_REQUIRED",
+          message: "Provide either a Clerk auth domain or an explicit JWKS URL"
+        }
+      },
+      400
+    );
+  }
   await repository.save({
-    id: `${c.req.param("tenantId")}:clerk-config`,
-    tenantId: c.req.param("tenantId") as string & { readonly __brand: "TenantId" },
+    id: `${tenantId}:clerk-config`,
+    tenantId: tenantId as string & { readonly __brand: "TenantId" },
     publishableKey: body.clerkPublishableKey,
-    encryptedSecretKey: result.encryptedSecretKey,
-    webhookSecret: body.clerkWebhookSecret,
-    jwksUrl: `https://clerk.${c.req.param("tenantId")}.archcommerce.com/.well-known/jwks.json`
+    encryptedSecretKey,
+    webhookSecret,
+    authDomain,
+    proxyUrl,
+    jwksUrl
   });
   return c.json({
     success: true,
-    data: result
+    data: {
+      configured: true,
+      encryptedSecretKey,
+      authDomain,
+      proxyUrl,
+      jwksUrl
+    }
   });
 });
 

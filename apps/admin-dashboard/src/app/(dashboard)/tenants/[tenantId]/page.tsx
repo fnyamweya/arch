@@ -1,9 +1,13 @@
+import { DashboardTablePageTemplate } from "@arch/ui-kit";
+import { createTenantDetailPage } from "../../../../features/dashboard/page-data";
+
 interface TenantPageProps {
-  readonly params: {
+  readonly params: Promise<{
     readonly tenantId: string;
-  };
+  }>;
 }
 
-export default function TenantDetailPage(props: TenantPageProps): JSX.Element {
-  return <main>Tenant {props.params.tenantId}</main>;
+export default async function TenantDetailPage(props: TenantPageProps) {
+  const { tenantId } = await props.params;
+  return <DashboardTablePageTemplate {...createTenantDetailPage(tenantId)} />;
 }

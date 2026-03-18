@@ -1,0 +1,24 @@
+{
+  "name": "@arch/storefront-admin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome check src"
+  },
+  "dependencies": {
+    "@arch/shared-kernel": "workspace:*",
+    "@arch/storefront-core": "workspace:*",
+    "@arch/storefront-validation": "workspace:*",
+    "@arch/storefront-theme": "workspace:*",
+    "@arch/storefront-layout": "workspace:*",
+    "@arch/storefront-blocks": "workspace:*",
+    "@arch/storefront-content": "workspace:*",
+    "@arch/storefront-routing": "workspace:*",
+    "@arch/storefront-seo": "workspace:*"
+  }
+}

@@ -1,3 +1,6 @@
-export default function CreateTenantPage(): JSX.Element {
-  return <main>Create Tenant</main>;
+import { DashboardFormPageTemplate } from "@arch/ui-kit";
+import { adminCreateTenantPage } from "../../../../features/dashboard/page-data";
+
+export default function CreateTenantPage() {
+  return <DashboardFormPageTemplate {...adminCreateTenantPage} />;
 }

@@ -5,12 +5,21 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles": "./src/styles/globals.css"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check src"
   },
   "peerDependencies": {
-    "react": "^19.0.0"
+    "@clerk/nextjs": "^7.0.0",
+    "@clerk/themes": "^2.0.0",
+    "next": "^16.0.0",
+    "next-themes": "^0.4.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   }
 }

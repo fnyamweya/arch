@@ -7,11 +7,13 @@
   "types": "src/index.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",
+    "dev": "wrangler dev --port 8788 --inspector-port 9231",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check src",
     "test": "vitest run"
   },
   "dependencies": {
+    "@arch/auth-contracts": "workspace:*",
     "@arch/db-schema": "workspace:*",
     "@arch/cloudflare-bindings": "workspace:*",
     "@arch/shared-kernel": "workspace:*",

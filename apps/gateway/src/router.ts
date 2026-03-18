@@ -8,8 +8,8 @@ import { ledgerRoutes } from "./routes/ledger.routes";
 import { orderRoutes } from "./routes/order.routes";
 import { storefrontRoutes } from "./routes/storefront.routes";
 import { vendorRoutes } from "./routes/vendor.routes";
+import { proxyToService } from "./utils/proxy";
 import { clerkAuthGuard } from "./middleware/clerk-auth-guard";
-import { corsHandler } from "./middleware/cors-handler";
 import { rateLimiter } from "./middleware/rate-limiter";
 import { requestLogger } from "./middleware/request-logger";
 import { sentryMiddleware } from "./middleware/sentry-middleware";
@@ -17,7 +17,13 @@ import { tenantResolver } from "./middleware/tenant-resolver";
 
 export const createGatewayRouter = (): Hono<{ Bindings: GatewayBindings; Variables: GatewayVariables }> => {
   const router = new Hono<{ Bindings: GatewayBindings; Variables: GatewayVariables }>();
-  router.use("*", requestLogger, corsHandler, tenantResolver, rateLimiter, sentryMiddleware);
+  router.use("*", requestLogger, tenantResolver, rateLimiter, sentryMiddleware);
+  // Health endpoints bypass auth
+  router.get("/catalog/health", async (c) => proxyToService(c, c.env.CATALOG_WORKER, "/catalog"));
+  router.get("/orders/health", async (c) => proxyToService(c, c.env.ORDER_WORKER, "/orders"));
+  router.get("/vendors/health", async (c) => proxyToService(c, c.env.VENDOR_WORKER, "/vendors"));
+  router.get("/admin/health", async (c) => proxyToService(c, c.env.TENANT_WORKER, "/admin"));
+  router.get("/ledger/health", async (c) => proxyToService(c, c.env.LEDGER_WORKER, "/ledger"));
   router.use("/catalog/*", clerkAuthGuard);
   router.use("/orders/*", clerkAuthGuard);
   router.use("/vendors/*", clerkAuthGuard);

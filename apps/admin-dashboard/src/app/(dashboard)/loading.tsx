@@ -1,3 +1,5 @@
-export default function AdminDashboardLoading(): JSX.Element {
-  return <main>Loading dashboard...</main>;
+import { PageContainer } from "@arch/ui-kit";
+
+export default function AdminDashboardLoading() {
+  return <PageContainer isLoading pageTitle="Loading..." />;
 }

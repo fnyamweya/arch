@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import type { GatewayBindings } from "@arch/cloudflare-bindings";
 import type { GatewayVariables } from "../types";
+import { errorEnvelope, toJson } from "./api-envelope";
 
 export const proxyToService = async (
   c: Context<{ Bindings: GatewayBindings; Variables: GatewayVariables }>,
@@ -29,5 +30,9 @@ export const proxyToService = async (
     headers,
     body: c.req.method === "GET" || c.req.method === "HEAD" ? undefined : await c.req.raw.arrayBuffer()
   });
-  return target.fetch(proxiedRequest);
+  try {
+    return await target.fetch(proxiedRequest);
+  } catch {
+    return toJson(errorEnvelope("SERVICE_UNAVAILABLE", "Upstream service is not available"), 503);
+  }
 };

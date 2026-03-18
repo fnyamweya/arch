@@ -6,6 +6,8 @@ export const clerkConfigurationsTable = sqliteTable("clerk_configurations", {
   clerkPublishableKey: text("clerk_publishable_key").notNull(),
   clerkSecretKeyEncrypted: text("clerk_secret_key_encrypted").notNull(),
   clerkWebhookSecret: text("clerk_webhook_secret").notNull(),
+  clerkAuthDomain: text("clerk_auth_domain"),
+  clerkProxyUrl: text("clerk_proxy_url"),
   clerkJwksUrl: text("clerk_jwks_url").notNull(),
   configuredAt: integer("configured_at", { mode: "timestamp_ms" }).notNull(),
   configuredBy: text("configured_by").notNull()

@@ -1,3 +1,6 @@
-export default function TenantsPage(): JSX.Element {
-  return <main>Tenants</main>;
+import { DashboardTablePageTemplate } from "@arch/ui-kit";
+import { adminTenantsPage } from "../../../features/dashboard/page-data";
+
+export default function TenantsPage() {
+  return <DashboardTablePageTemplate {...adminTenantsPage} />;
 }

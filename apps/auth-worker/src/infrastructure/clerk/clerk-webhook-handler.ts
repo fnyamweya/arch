@@ -5,7 +5,12 @@ export interface ClerkWebhookEvent {
   readonly data: Readonly<Record<string, unknown>>;
 }
 
-const getHeader = (request: Request, headerName: string): string => {
+interface WebhookRequest {
+  readonly headers: Headers;
+  text(): Promise<string>;
+}
+
+const getHeader = (request: WebhookRequest, headerName: string): string => {
   const value: string | null = request.headers.get(headerName);
   if (value === null || value.length === 0) {
     throw new Error(`Missing required header: ${headerName}`);
@@ -14,7 +19,7 @@ const getHeader = (request: Request, headerName: string): string => {
 };
 
 export const parseClerkWebhook = async (
-  request: Request,
+  request: WebhookRequest,
   webhookSecret: string
 ): Promise<ClerkWebhookEvent> => {
   const payloadText: string = await request.text();

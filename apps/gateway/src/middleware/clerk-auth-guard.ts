@@ -43,7 +43,13 @@ export const clerkAuthGuard: MiddlewareHandler<{
       tenantId: tenantContext?.tenantId ?? null
     })
   });
-  const verificationResponse: Response = await c.env.AUTH_WORKER.fetch(verificationRequest);
+  let verificationResponse: Response;
+  try {
+    verificationResponse = await c.env.AUTH_WORKER.fetch(verificationRequest);
+  } catch {
+    c.res = toJson(errorEnvelope("SERVICE_UNAVAILABLE", "Auth service is not available"), 503);
+    return;
+  }
   if (!verificationResponse.ok) {
     c.res = toJson(errorEnvelope("UNAUTHORIZED", "Token verification request failed"), 401);
     return;

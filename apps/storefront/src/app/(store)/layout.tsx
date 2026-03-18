@@ -1,6 +1,15 @@
 import type { ReactNode } from "react";
-import { StoreShell } from "../../components/layout/store-shell";
+import { StoreShell } from "@arch/ui-kit";
+import { storeNavItems } from "../../config/nav-config";
 
-export default function StoreLayout(props: { readonly children: ReactNode }): JSX.Element {
-  return <StoreShell>{props.children}</StoreShell>;
+export default function StoreLayout(props: { readonly children: ReactNode }) {
+  return (
+    <StoreShell
+      navItems={storeNavItems}
+      storeName="Store"
+      signInPath="/sign-in"
+    >
+      {props.children}
+    </StoreShell>
+  );
 }

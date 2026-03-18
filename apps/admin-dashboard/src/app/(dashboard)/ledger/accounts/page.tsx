@@ -1,3 +1,6 @@
-export default function LedgerAccountsPage(): JSX.Element {
-  return <main>Ledger Accounts</main>;
+import { DashboardTablePageTemplate } from "@arch/ui-kit";
+import { adminLedgerAccountsPage } from "../../../../features/dashboard/page-data";
+
+export default function LedgerAccountsPage() {
+  return <DashboardTablePageTemplate {...adminLedgerAccountsPage} />;
 }

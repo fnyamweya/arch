@@ -1,13 +1,13 @@
-const toBytes = (value: string): Uint8Array => {
-  return new TextEncoder().encode(value);
+const toBytes = (value: string): Uint8Array<ArrayBuffer> => {
+  return Uint8Array.from(new TextEncoder().encode(value)) as Uint8Array<ArrayBuffer>;
 };
 
 const toBase64 = (bytes: Uint8Array): string => {
   return btoa(String.fromCharCode(...bytes));
 };
 
-const fromBase64 = (value: string): Uint8Array => {
-  return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+const fromBase64 = (value: string): Uint8Array<ArrayBuffer> => {
+  return Uint8Array.from(atob(value), (character) => character.charCodeAt(0)) as Uint8Array<ArrayBuffer>;
 };
 
 const deriveAesGcmKey = async (secret: string): Promise<CryptoKey> => {
@@ -17,7 +17,7 @@ const deriveAesGcmKey = async (secret: string): Promise<CryptoKey> => {
 
 export const encryptClerkSecretKey = async (secretKey: string, encryptionSecret: string): Promise<string> => {
   const key: CryptoKey = await deriveAesGcmKey(encryptionSecret);
-  const iv: Uint8Array = crypto.getRandomValues(new Uint8Array(12));
+  const iv: Uint8Array<ArrayBuffer> = Uint8Array.from(crypto.getRandomValues(new Uint8Array(12))) as Uint8Array<ArrayBuffer>;
   const encrypted: ArrayBuffer = await crypto.subtle.encrypt(
     {
       name: "AES-GCM",
@@ -38,8 +38,8 @@ export const decryptClerkSecretKey = async (
     throw new Error("Invalid encrypted payload");
   }
   const key: CryptoKey = await deriveAesGcmKey(encryptionSecret);
-  const iv: Uint8Array = fromBase64(segments[0]);
-  const encrypted: Uint8Array = fromBase64(segments[1]);
+  const iv: Uint8Array<ArrayBuffer> = Uint8Array.from(fromBase64(segments[0])) as Uint8Array<ArrayBuffer>;
+  const encrypted: Uint8Array<ArrayBuffer> = fromBase64(segments[1]);
   const decrypted: ArrayBuffer = await crypto.subtle.decrypt(
     {
       name: "AES-GCM",

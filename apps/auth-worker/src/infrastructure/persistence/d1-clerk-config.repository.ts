@@ -27,6 +27,8 @@ export class D1ClerkConfigRepository implements ClerkConfigRepository {
       publishableKey: row.clerkPublishableKey,
       encryptedSecretKey: row.clerkSecretKeyEncrypted,
       webhookSecret: row.clerkWebhookSecret,
+      authDomain: row.clerkAuthDomain,
+      proxyUrl: row.clerkProxyUrl,
       jwksUrl: row.clerkJwksUrl
     };
   }
@@ -41,6 +43,8 @@ export class D1ClerkConfigRepository implements ClerkConfigRepository {
         clerkPublishableKey: configuration.publishableKey,
         clerkSecretKeyEncrypted: configuration.encryptedSecretKey,
         clerkWebhookSecret: configuration.webhookSecret,
+        clerkAuthDomain: configuration.authDomain,
+        clerkProxyUrl: configuration.proxyUrl,
         clerkJwksUrl: configuration.jwksUrl,
         configuredAt: now,
         configuredBy: "system"
@@ -51,6 +55,8 @@ export class D1ClerkConfigRepository implements ClerkConfigRepository {
           clerkPublishableKey: configuration.publishableKey,
           clerkSecretKeyEncrypted: configuration.encryptedSecretKey,
           clerkWebhookSecret: configuration.webhookSecret,
+          clerkAuthDomain: configuration.authDomain,
+          clerkProxyUrl: configuration.proxyUrl,
           clerkJwksUrl: configuration.jwksUrl,
           configuredAt: now,
           configuredBy: "system"

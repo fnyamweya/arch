@@ -21,12 +21,16 @@ export class RateLimiterDurableObject {
       return new Response("Method Not Allowed", { status: 405 });
     }
     const body = (await request.json()) as Partial<RateLimitRequestBody>;
+    const maxRequests = body.maxRequests;
+    const windowMs = body.windowMs;
     if (
       typeof body.key !== "string" ||
-      !Number.isInteger(body.maxRequests) ||
-      !Number.isInteger(body.windowMs) ||
-      body.maxRequests <= 0 ||
-      body.windowMs <= 0
+      typeof maxRequests !== "number" ||
+      typeof windowMs !== "number" ||
+      !Number.isInteger(maxRequests) ||
+      !Number.isInteger(windowMs) ||
+      maxRequests <= 0 ||
+      windowMs <= 0
     ) {
       return new Response(
         JSON.stringify({
@@ -46,7 +50,7 @@ export class RateLimiterDurableObject {
     const storageKey: string = `state:${body.key}`;
     const existing: RateLimitState | undefined = await this.state.storage.get<RateLimitState>(storageKey);
     const current: RateLimitState =
-      existing === undefined || now - existing.windowStartedAt >= body.windowMs
+      existing === undefined || now - existing.windowStartedAt >= windowMs
         ? { count: 0, windowStartedAt: now }
         : existing;
     const updated: RateLimitState = {
@@ -54,14 +58,14 @@ export class RateLimiterDurableObject {
       windowStartedAt: current.windowStartedAt
     };
     await this.state.storage.put(storageKey, updated);
-    if (updated.count > body.maxRequests) {
+    if (updated.count > maxRequests) {
       return new Response(JSON.stringify({ success: false, error: { code: "RATE_LIMITED", message: "Rate limit exceeded" } }), {
         status: 429,
         headers: { "content-type": "application/json" }
       });
     }
-    const resetInMs: number = Math.max(0, body.windowMs - (now - updated.windowStartedAt));
-    return new Response(JSON.stringify({ success: true, data: { allowed: true, remaining: body.maxRequests - updated.count, resetInMs } }), {
+    const resetInMs: number = Math.max(0, windowMs - (now - updated.windowStartedAt));
+    return new Response(JSON.stringify({ success: true, data: { allowed: true, remaining: maxRequests - updated.count, resetInMs } }), {
       headers: { "content-type": "application/json" }
     });
   }

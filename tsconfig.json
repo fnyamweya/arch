@@ -1,28 +1,107 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/shared-kernel" },
-    { "path": "./packages/cloudflare-bindings" },
-    { "path": "./packages/tenant-context" },
-    { "path": "./packages/auth-contracts" },
-    { "path": "./packages/api-contracts" },
-    { "path": "./packages/domain-events" },
-    { "path": "./packages/db-schema" },
-    { "path": "./packages/observability" },
-    { "path": "./packages/infrastructure-sdk" },
-    { "path": "./packages/ui-kit" },
-    { "path": "./apps/gateway" },
-    { "path": "./apps/auth-worker" },
-    { "path": "./apps/catalog-worker" },
-    { "path": "./apps/order-worker" },
-    { "path": "./apps/vendor-worker" },
-    { "path": "./apps/tenant-worker" },
-    { "path": "./apps/ledger-worker" },
-    { "path": "./apps/cart-durable-object" },
-    { "path": "./apps/inventory-durable-object" },
-    { "path": "./apps/rate-limiter-durable-object" },
-    { "path": "./apps/admin-dashboard" },
-    { "path": "./apps/vendor-dashboard" },
-    { "path": "./apps/storefront" }
+    {
+      "path": "./packages/shared-kernel"
+    },
+    {
+      "path": "./packages/cloudflare-bindings"
+    },
+    {
+      "path": "./packages/tenant-context"
+    },
+    {
+      "path": "./packages/auth-contracts"
+    },
+    {
+      "path": "./packages/api-contracts"
+    },
+    {
+      "path": "./packages/domain-events"
+    },
+    {
+      "path": "./packages/db-schema"
+    },
+    {
+      "path": "./packages/observability"
+    },
+    {
+      "path": "./packages/infrastructure-sdk"
+    },
+    {
+      "path": "./packages/ui-kit"
+    },
+    {
+      "path": "./packages/storefront-core"
+    },
+    {
+      "path": "./packages/storefront-validation"
+    },
+    {
+      "path": "./packages/storefront-theme"
+    },
+    {
+      "path": "./packages/storefront-layout"
+    },
+    {
+      "path": "./packages/storefront-blocks"
+    },
+    {
+      "path": "./packages/storefront-content"
+    },
+    {
+      "path": "./packages/storefront-routing"
+    },
+    {
+      "path": "./packages/storefront-seo"
+    },
+    {
+      "path": "./packages/storefront-api-contracts"
+    },
+    {
+      "path": "./packages/storefront-api"
+    },
+    {
+      "path": "./packages/storefront-admin"
+    },
+    {
+      "path": "./apps/gateway"
+    },
+    {
+      "path": "./apps/auth-worker"
+    },
+    {
+      "path": "./apps/catalog-worker"
+    },
+    {
+      "path": "./apps/order-worker"
+    },
+    {
+      "path": "./apps/vendor-worker"
+    },
+    {
+      "path": "./apps/tenant-worker"
+    },
+    {
+      "path": "./apps/ledger-worker"
+    },
+    {
+      "path": "./apps/cart-durable-object"
+    },
+    {
+      "path": "./apps/inventory-durable-object"
+    },
+    {
+      "path": "./apps/rate-limiter-durable-object"
+    },
+    {
+      "path": "./apps/admin-dashboard"
+    },
+    {
+      "path": "./apps/vendor-dashboard"
+    },
+    {
+      "path": "./apps/storefront"
+    }
   ]
 }

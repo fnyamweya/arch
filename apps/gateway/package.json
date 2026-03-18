@@ -7,6 +7,7 @@
   "types": "src/index.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",
+    "dev": "wrangler dev --port 8787 --inspector-port 9230",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check src",
     "test": "vitest run"
@@ -17,6 +18,7 @@
     "@arch/cloudflare-bindings": "workspace:*",
     "@arch/observability": "workspace:*",
     "@arch/tenant-context": "workspace:*",
+    "@hono/swagger-ui": "^0.6.1",
     "hono": "^4.7.0"
   }
 }

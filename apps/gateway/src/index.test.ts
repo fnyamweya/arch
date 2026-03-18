@@ -46,7 +46,7 @@ const createGatewayEnv = () => {
     PLATFORM_DB: {} as D1Database,
     PLATFORM_CONFIG_KV: {
       get: async () => null
-    } as KVNamespace,
+    } as unknown as KVNamespace,
     RATE_LIMITER_WORKER: createFetcher(() =>
       new Response(JSON.stringify({ success: true, data: { allowed: true, remaining: 100, resetInMs: 1000 } }), {
         headers: { "content-type": "application/json" }

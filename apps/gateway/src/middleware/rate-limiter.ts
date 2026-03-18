@@ -19,27 +19,32 @@ export const rateLimiter: MiddlewareHandler<{
   const tenantContext = c.get("tenantContext");
   const clientIp: string = c.req.header("cf-connecting-ip") ?? "unknown";
   const limiterKey: string = `${tenantContext?.tenantId ?? "platform"}:${clientIp}`;
-  const response: Response = await c.env.RATE_LIMITER_WORKER.fetch("https://rate-limiter-worker/limit", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({
-      key: limiterKey,
-      maxRequests: 120,
-      windowMs: 60_000
-    })
-  });
-  if (!response.ok) {
-    c.res = toJson(errorEnvelope("RATE_LIMITED", "Too many requests"), 429);
-    return;
+  try {
+    const response: Response = await c.env.RATE_LIMITER_WORKER.fetch("https://rate-limiter-worker/limit", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        key: limiterKey,
+        maxRequests: 120,
+        windowMs: 60_000
+      })
+    });
+    if (response.ok) {
+      const body = (await response.json()) as RateLimitResponse;
+      if (body.success && body.data !== undefined) {
+        if (!body.data.allowed) {
+          c.res = toJson(errorEnvelope("RATE_LIMITED", "Too many requests"), 429);
+          return;
+        }
+        c.header("x-rate-limit-remaining", String(body.data.remaining));
+        c.header("x-rate-limit-reset-ms", String(body.data.resetInMs));
+      }
+    }
+    // Non-ok responses (e.g. service not connected) fall through — fail-open
+  } catch {
+    // Fail-open: allow request if rate limiter service is unavailable (e.g. local dev)
   }
-  const body = (await response.json()) as RateLimitResponse;
-  if (!body.success || body.data === undefined || !body.data.allowed) {
-    c.res = toJson(errorEnvelope("RATE_LIMITED", "Too many requests"), 429);
-    return;
-  }
-  c.header("x-rate-limit-remaining", String(body.data.remaining));
-  c.header("x-rate-limit-reset-ms", String(body.data.resetInMs));
   await next();
 };

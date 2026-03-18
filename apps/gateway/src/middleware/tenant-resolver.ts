@@ -12,28 +12,32 @@ interface TenantResolutionRecord {
 }
 
 const resolveTenantContext = async (host: string, env: GatewayBindings): Promise<ResolvedTenantContext | null> => {
-  const tenantWorkerResponse: Response = await env.TENANT_WORKER.fetch("https://tenant-worker/internal/resolve-tenant", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({ domain: host })
-  });
-  if (tenantWorkerResponse.ok) {
-    const responseBody = (await tenantWorkerResponse.json()) as {
-      readonly success: boolean;
-      readonly data?: TenantResolutionRecord;
-    };
-    if (responseBody.success && responseBody.data !== undefined) {
-      const parsed: TenantResolutionRecord = responseBody.data;
-      return {
-        tenantId: parsed.tenantId,
-        tenantSlug: parsed.tenantSlug,
-        tenantDomain: parsed.tenantDomain,
-        sentryDsn: parsed.sentryDsn ?? null,
-        clerkPublishableKey: parsed.clerkPublishableKey ?? null
+  try {
+    const tenantWorkerResponse: Response = await env.TENANT_WORKER.fetch("https://tenant-worker/internal/resolve-tenant", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ domain: host })
+    });
+    if (tenantWorkerResponse.ok) {
+      const responseBody = (await tenantWorkerResponse.json()) as {
+        readonly success: boolean;
+        readonly data?: TenantResolutionRecord;
       };
+      if (responseBody.success && responseBody.data !== undefined) {
+        const parsed: TenantResolutionRecord = responseBody.data;
+        return {
+          tenantId: parsed.tenantId,
+          tenantSlug: parsed.tenantSlug,
+          tenantDomain: parsed.tenantDomain,
+          sentryDsn: parsed.sentryDsn ?? null,
+          clerkPublishableKey: parsed.clerkPublishableKey ?? null
+        };
+      }
     }
+  } catch {
+    // Service binding unavailable (e.g. local dev) — fall through to other resolution methods
   }
   const serialized: string | null = await env.PLATFORM_CONFIG_KV.get(`tenant-domain:${host}`);
   if (serialized !== null) {
@@ -58,6 +62,18 @@ const resolveTenantContext = async (host: string, env: GatewayBindings): Promise
         clerkPublishableKey: null
       };
     }
+  }
+  // Local development fallback
+  const localHosts = ["localhost", "127.0.0.1", "0.0.0.0"];
+  const hostWithoutPort = host.split(":")[0] ?? host;
+  if (localHosts.includes(hostWithoutPort)) {
+    return {
+      tenantId: "dev-tenant",
+      tenantSlug: "dev",
+      tenantDomain: host,
+      sentryDsn: null,
+      clerkPublishableKey: null
+    };
   }
   return null;
 };
