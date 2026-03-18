@@ -8,5 +8,6 @@ export interface GatewayBindings {
   readonly VENDOR_WORKER: Fetcher;
   readonly TENANT_WORKER: Fetcher;
   readonly LEDGER_WORKER: Fetcher;
+  readonly PLATFORM_BASE_DOMAIN: string;
   readonly PLATFORM_SENTRY_DSN: string;
 }

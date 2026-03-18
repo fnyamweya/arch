@@ -5,7 +5,6 @@ export interface ResolvedTenantContext {
   readonly tenantSlug: string;
   readonly tenantDomain: string;
   readonly sentryDsn: string | null;
-  readonly clerkPublishableKey: string | null;
 }
 
 export interface ResolvedAuthContext {

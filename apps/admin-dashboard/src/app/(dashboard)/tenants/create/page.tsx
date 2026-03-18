@@ -1,6 +1,5 @@
-import { DashboardFormPageTemplate } from "@arch/ui-kit";
-import { adminCreateTenantPage } from "../../../../features/dashboard/page-data";
+import { CreateTenantForm } from "./create-tenant-form";
 
 export default function CreateTenantPage() {
-  return <DashboardFormPageTemplate {...adminCreateTenantPage} />;
+  return <CreateTenantForm />;
 }

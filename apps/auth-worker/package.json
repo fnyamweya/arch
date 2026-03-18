@@ -14,12 +14,14 @@
   },
   "dependencies": {
     "@arch/auth-contracts": "workspace:*",
-    "@arch/db-schema": "workspace:*",
     "@arch/cloudflare-bindings": "workspace:*",
+    "@arch/db-schema": "workspace:*",
     "@arch/shared-kernel": "workspace:*",
-    "jose": "^5.9.6",
+    "better-auth": "^1.5.5",
+    "drizzle-orm": "^0.41.0",
+    "hono": "^4.7.0",
+    "jose": "^6.1.0",
     "svix": "^1.59.0",
-    "drizzle-orm": "^0.39.0",
-    "hono": "^4.7.0"
+    "ulid": "^2.3.0"
   }
 }

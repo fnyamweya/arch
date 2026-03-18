@@ -15,9 +15,8 @@ const createGatewayEnv = () => {
     data: {
       tenantId: "tenant-a",
       tenantSlug: "tenant-a",
-      tenantDomain: "tenant-a.archcommerce.com",
-      sentryDsn: null,
-      clerkPublishableKey: "pk_test"
+      tenantDomain: "tenant-a.africasokoni.co.ke",
+      sentryDsn: null
     }
   };
   const authVerifyBody = {
@@ -76,13 +75,14 @@ const createGatewayEnv = () => {
       });
     }),
     LEDGER_WORKER: okService,
+    PLATFORM_BASE_DOMAIN: "africasokoni.co.ke",
     PLATFORM_SENTRY_DSN: "https://example@sentry.io/1"
   };
 };
 
 describe("gateway integration", () => {
   it("proxies authenticated catalog request", async () => {
-    const response = await app.request("https://tenant-a.archcommerce.com/catalog/products", {
+    const response = await app.request("https://tenant-a.africasokoni.co.ke/catalog/products", {
       method: "GET",
       headers: {
         authorization: "Bearer header.payload.signature"
@@ -95,7 +95,7 @@ describe("gateway integration", () => {
 
   it("rejects missing auth for protected route", async () => {
     const response = await app.request(
-      "https://tenant-a.archcommerce.com/orders/orders",
+      "https://tenant-a.africasokoni.co.ke/orders/orders",
       { method: "GET" },
       createGatewayEnv()
     );

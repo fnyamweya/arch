@@ -8,8 +8,9 @@ interface TenantResolutionRecord {
   readonly tenantSlug: string;
   readonly tenantDomain: string;
   readonly sentryDsn?: string | null;
-  readonly clerkPublishableKey?: string | null;
 }
+
+const normalizeBaseDomain = (domain: string): string => domain.trim().toLowerCase().replace(/^\.+/, "").replace(/\.+$/, "");
 
 const resolveTenantContext = async (host: string, env: GatewayBindings): Promise<ResolvedTenantContext | null> => {
   try {
@@ -31,8 +32,7 @@ const resolveTenantContext = async (host: string, env: GatewayBindings): Promise
           tenantId: parsed.tenantId,
           tenantSlug: parsed.tenantSlug,
           tenantDomain: parsed.tenantDomain,
-          sentryDsn: parsed.sentryDsn ?? null,
-          clerkPublishableKey: parsed.clerkPublishableKey ?? null
+          sentryDsn: parsed.sentryDsn ?? null
         };
       }
     }
@@ -46,11 +46,10 @@ const resolveTenantContext = async (host: string, env: GatewayBindings): Promise
       tenantId: parsed.tenantId,
       tenantSlug: parsed.tenantSlug,
       tenantDomain: parsed.tenantDomain,
-      sentryDsn: parsed.sentryDsn ?? null,
-      clerkPublishableKey: parsed.clerkPublishableKey ?? null
+      sentryDsn: parsed.sentryDsn ?? null
     };
   }
-  const domainSuffix = ".archcommerce.com";
+  const domainSuffix = `.${normalizeBaseDomain(env.PLATFORM_BASE_DOMAIN)}`;
   if (host.endsWith(domainSuffix)) {
     const tenantSlug = host.slice(0, host.length - domainSuffix.length);
     if (tenantSlug.length > 0) {
@@ -58,8 +57,7 @@ const resolveTenantContext = async (host: string, env: GatewayBindings): Promise
         tenantId: tenantSlug,
         tenantSlug,
         tenantDomain: host,
-        sentryDsn: null,
-        clerkPublishableKey: null
+        sentryDsn: null
       };
     }
   }
@@ -71,8 +69,7 @@ const resolveTenantContext = async (host: string, env: GatewayBindings): Promise
       tenantId: "dev-tenant",
       tenantSlug: "dev",
       tenantDomain: host,
-      sentryDsn: null,
-      clerkPublishableKey: null
+      sentryDsn: null
     };
   }
   return null;

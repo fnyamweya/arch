@@ -1,4 +1,3 @@
-export * from "./global/clerk-configurations";
 export * from "./global/global-users";
 export * from "./global/platform-accounts";
 export * from "./global/platform-ledger";

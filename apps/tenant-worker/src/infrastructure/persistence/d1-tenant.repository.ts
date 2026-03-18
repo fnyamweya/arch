@@ -1,7 +1,7 @@
 import type { TenantAggregate } from "../../domain/aggregates/tenant.aggregate";
 import type { TenantDomainEntity } from "../../domain/entities/tenant-domain.entity";
 import type { TenantRepository } from "../../domain/repositories/tenant.repository";
-import { clerkConfigurationsTable, tenantDomainsTable, tenantsTable } from "@arch/db-schema";
+import { tenantDomainsTable, tenantsTable } from "@arch/db-schema";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 
@@ -23,13 +23,7 @@ export class D1TenantRepository implements TenantRepository {
       .from(tenantDomainsTable)
       .where(eq(tenantDomainsTable.tenantId, tenant.id))
       .limit(1);
-    const configRows = await this.db
-      .select()
-      .from(clerkConfigurationsTable)
-      .where(eq(clerkConfigurationsTable.tenantId, tenant.id))
-      .limit(1);
     const domain = domainRows.find((entry) => entry.isPrimary) ?? domainRows[0];
-    const config = configRows[0];
     return {
       tenant: {
         id: tenant.id,
@@ -39,12 +33,8 @@ export class D1TenantRepository implements TenantRepository {
       },
       configuration: {
         tenantId: tenant.id,
-        primaryDomain: domain?.domain ?? `${tenant.slug}.archcommerce.com`,
-        sentryDsn: null,
-        clerkPublishableKey: config?.clerkPublishableKey ?? "",
-        clerkAuthDomain: config?.clerkAuthDomain ?? null,
-        clerkProxyUrl: config?.clerkProxyUrl ?? null,
-        clerkJwksUrl: config?.clerkJwksUrl === "unset" ? null : (config?.clerkJwksUrl ?? null)
+        primaryDomain: domain?.domain ?? `${tenant.slug}.africasokoni.co.ke`,
+        sentryDsn: null
       }
     };
   }
@@ -146,30 +136,6 @@ export class D1TenantRepository implements TenantRepository {
         set: {
           domain: tenant.configuration.primaryDomain,
           isPrimary: true
-        }
-      });
-    await this.db
-      .insert(clerkConfigurationsTable)
-      .values({
-        id: `${tenant.tenant.id}:clerk`,
-        tenantId: tenant.tenant.id,
-        clerkPublishableKey: tenant.configuration.clerkPublishableKey,
-        clerkSecretKeyEncrypted: "unset",
-        clerkWebhookSecret: "unset",
-        clerkAuthDomain: tenant.configuration.clerkAuthDomain,
-        clerkProxyUrl: tenant.configuration.clerkProxyUrl,
-        clerkJwksUrl: "unset",
-        configuredAt: now,
-        configuredBy: "system"
-      })
-      .onConflictDoUpdate({
-        target: clerkConfigurationsTable.tenantId,
-        set: {
-          clerkPublishableKey: tenant.configuration.clerkPublishableKey,
-          clerkAuthDomain: tenant.configuration.clerkAuthDomain,
-          clerkProxyUrl: tenant.configuration.clerkProxyUrl,
-          configuredAt: now,
-          configuredBy: "system"
         }
       });
   }

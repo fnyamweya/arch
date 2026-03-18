@@ -15,9 +15,16 @@
       "id": "platform-config-kv-id"
     }
   ],
+  "services": [
+    {
+      "binding": "AUTH_WORKER",
+      "service": "arch-auth-worker"
+    }
+  ],
   "vars": {
-    "CLOUDFLARE_ACCOUNT_ID": "replace-account-id",
-    "CLOUDFLARE_API_TOKEN": "replace-api-token",
+    "PLATFORM_BASE_DOMAIN": "africasokoni.co.ke",
+    "GATEWAY_WORKER_SERVICE": "arch-gateway",
+    "GATEWAY_WORKER_ENVIRONMENT": "",
     "PLATFORM_SENTRY_DSN": "https://example@sentry.io/1"
   }
 }

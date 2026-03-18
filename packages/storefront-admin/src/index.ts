@@ -65,6 +65,29 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+interface DigestAlgorithm {
+  readonly digest: (algorithm: "SHA-256", data: Uint8Array) => Promise<ArrayBuffer>;
+}
+
+interface CryptoLike {
+  readonly subtle?: DigestAlgorithm;
+}
+
+const redirectStatuses = new Set<RedirectRuleRecord["httpStatus"]>([301, 302, 307, 308]);
+
+function normalizeRedirectHttpStatus(httpStatus?: string): RedirectRuleRecord["httpStatus"] {
+  if (httpStatus === undefined) {
+    return 301;
+  }
+
+  const parsedStatus = Number(httpStatus);
+  if (!Number.isInteger(parsedStatus) || !redirectStatuses.has(parsedStatus as RedirectRuleRecord["httpStatus"])) {
+    throw new Error(`Unsupported redirect HTTP status "${httpStatus}"`);
+  }
+
+  return parsedStatus as RedirectRuleRecord["httpStatus"];
+}
+
 // ─── Storefront Admin Service ───
 
 export class StorefrontAdminService {
@@ -639,11 +662,12 @@ export class PreviewService {
 }
 
 async function hashToken(token: string): Promise<string> {
-  // Use Web Crypto API (available in CF Workers and Node 18+)
-  if (typeof globalThis.crypto?.subtle !== "undefined") {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(token);
-    const hash = await globalThis.crypto.subtle.digest("SHA-256", data);
+  const cryptoLike = globalThis as typeof globalThis & { readonly crypto?: CryptoLike };
+
+  // Use Web Crypto API when available without requiring DOM libs in this package.
+  if (cryptoLike.crypto?.subtle !== undefined) {
+    const data = Uint8Array.from(token, (character) => character.charCodeAt(0));
+    const hash = await cryptoLike.crypto.subtle.digest("SHA-256", data);
     return Array.from(new Uint8Array(hash))
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
@@ -820,7 +844,7 @@ export class SeoAdminService {
       storefrontId: input.storefrontId,
       sourcePath: input.sourcePath,
       destinationPath: input.destinationPath,
-      httpStatus: (input.httpStatus ?? "301") as RedirectRuleRecord["httpStatus"],
+      httpStatus: normalizeRedirectHttpStatus(input.httpStatus),
       active: true,
       createdAt: nowIso(),
       updatedAt: nowIso(),

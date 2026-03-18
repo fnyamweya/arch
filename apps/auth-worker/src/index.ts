@@ -1,199 +1,603 @@
 import { Hono } from "hono";
 import type { AuthBindings } from "@arch/cloudflare-bindings";
-import type { AuthTokenPayload } from "@arch/auth-contracts";
-import { configureTenantClerkKeys } from "./application/commands/configure-tenant-clerk-keys";
-import { verifyClerkJwt } from "./infrastructure/clerk/clerk-jwt-verifier";
-import { D1ClerkConfigRepository } from "./infrastructure/persistence/d1-clerk-config.repository";
+import type { AuthTokenPayload, Permission, PlatformRole, TenantRole } from "@arch/auth-contracts";
+import { PERMISSIONS, PLATFORM_ROLE, TENANT_ROLE } from "@arch/auth-contracts";
+import { ulid } from "ulid";
 import { D1IdentityRepository } from "./infrastructure/persistence/d1-identity.repository";
-import { parseClerkWebhook } from "./infrastructure/clerk/clerk-webhook-handler";
+import { createAuth, getAuthConfigurationSummary } from "./better-auth";
 
 const app = new Hono<{ Bindings: AuthBindings }>();
 
+type SessionRow = {
+  readonly id: string;
+  readonly token?: string;
+  readonly userId: string;
+  readonly expiresAt: string | number;
+  readonly createdAt: string | number;
+};
+
+type UserRow = {
+  readonly id: string;
+  readonly email: string | null;
+  readonly name: string | null;
+  readonly image: string | null;
+};
+
+type BootstrapUserRequest = {
+  readonly email?: string;
+  readonly name?: string;
+  readonly password?: string;
+  readonly memberships?: ReadonlyArray<{
+    readonly tenantId?: string;
+    readonly role?: PlatformRole | TenantRole;
+  }>;
+};
+
+type BootstrapRequestBody = {
+  readonly users?: ReadonlyArray<BootstrapUserRequest>;
+};
+
+type BootstrapUserResult = {
+  readonly userId: string;
+  readonly email: string;
+  readonly name: string;
+  readonly password: string;
+  readonly temporaryPassword: boolean;
+  readonly memberships: ReadonlyArray<{
+    readonly tenantId: string;
+    readonly role: PlatformRole | TenantRole;
+  }>;
+};
+
+const SECURE_COOKIE_PREFIX = "__Secure-";
+
+const ROLE_PERMISSIONS: Record<PlatformRole | TenantRole, readonly Permission[]> = {
+  [PLATFORM_ROLE.PLATFORM_ADMIN]: Object.values(PERMISSIONS),
+  [TENANT_ROLE.TENANT_ADMIN]: [
+    PERMISSIONS.MANAGE_TENANTS,
+    PERMISSIONS.MANAGE_TENANT_CONFIG,
+    PERMISSIONS.MANAGE_VENDORS,
+    PERMISSIONS.MANAGE_PRODUCTS,
+    PERMISSIONS.MANAGE_ORDERS,
+    PERMISSIONS.VIEW_LEDGER,
+    PERMISSIONS.MANAGE_LEDGER,
+  ],
+  [TENANT_ROLE.VENDOR_OWNER]: [
+    PERMISSIONS.MANAGE_VENDORS,
+    PERMISSIONS.MANAGE_PRODUCTS,
+    PERMISSIONS.MANAGE_ORDERS,
+  ],
+  [TENANT_ROLE.VENDOR_STAFF]: [PERMISSIONS.MANAGE_PRODUCTS, PERMISSIONS.MANAGE_ORDERS],
+  [TENANT_ROLE.CUSTOMER]: [],
+};
+
+const toEpochSeconds = (value: string | number) => {
+  if (typeof value === "number") {
+    return Math.floor(value / 1000);
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? Math.floor(Date.now() / 1000) : Math.floor(parsed / 1000);
+};
+
+const mergePermissions = (roles: ReadonlyArray<PlatformRole | TenantRole>) => {
+  const permissions = new Set<Permission>();
+
+  for (const role of roles) {
+    for (const permission of ROLE_PERMISSIONS[role] ?? []) {
+      permissions.add(permission);
+    }
+  }
+
+  return Array.from(permissions);
+};
+
+const extractBearerToken = (headerValue: string | undefined): string | null => {
+  if (headerValue === undefined || headerValue.length === 0) {
+    return null;
+  }
+  const match: RegExpMatchArray | null = headerValue.match(/^Bearer\s+(.+)$/i);
+  if (match === null || match[1] === undefined || match[1].length === 0) {
+    return null;
+  }
+  return match[1];
+};
+
+const parseCookies = (cookieHeader: string) => {
+  const cookieMap = new Map<string, string>();
+
+  for (const cookie of cookieHeader.split("; ")) {
+    const [name, value] = cookie.split(/=(.*)/s);
+    if (name && value) {
+      cookieMap.set(name, value);
+    }
+  }
+
+  return cookieMap;
+};
+
+const getSessionCookie = (headers: Headers) => {
+  const cookies = headers.get("cookie");
+
+  if (!cookies) {
+    return null;
+  }
+
+  const parsedCookie = parseCookies(cookies);
+  const getCookie = (name: string) =>
+    parsedCookie.get(name) ?? parsedCookie.get(`${SECURE_COOKIE_PREFIX}${name}`) ?? null;
+
+  return getCookie("better-auth.session_token") ?? getCookie("better-auth-session_token");
+};
+
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+const getUserByEmail = async (env: AuthBindings, email: string) => {
+  return env.PLATFORM_DB.prepare(
+    'SELECT id, email, name, image FROM "user" WHERE lower(email) = ? LIMIT 1'
+  )
+    .bind(normalizeEmail(email))
+    .first<UserRow>();
+};
+
+const deleteSessionByToken = async (env: AuthBindings, token: string | undefined) => {
+  if (token === undefined || token.length === 0) {
+    return;
+  }
+
+  await env.PLATFORM_DB.prepare('DELETE FROM "session" WHERE token = ?').bind(token).run();
+};
+
+const createAuthUser = async (
+  env: AuthBindings,
+  request: { readonly email: string; readonly name: string; readonly password: string }
+) => {
+  const auth = createAuth(env);
+  const response = await auth.handler(
+    new Request("http://localhost/api/auth/sign-up/email", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000"
+      },
+      body: JSON.stringify(request)
+    })
+  );
+
+  const payload = (await response.json().catch(() => null)) as
+    | {
+      readonly user?: { readonly id?: string };
+      readonly token?: string;
+      readonly message?: string;
+    }
+    | null;
+
+  if (!response.ok) {
+    throw new Error(payload?.message ?? `Unable to bootstrap auth user (${response.status}).`);
+  }
+
+  await deleteSessionByToken(env, payload?.token);
+
+  const userId = payload?.user?.id;
+  if (typeof userId === "string" && userId.length > 0) {
+    return userId;
+  }
+
+  const createdUser = await getUserByEmail(env, request.email);
+  if (createdUser?.id) {
+    return createdUser.id;
+  }
+
+  throw new Error("Auth signup completed without returning a user record.");
+};
+
+const requireInternalBootstrapSecret = (request: Request, env: AuthBindings) => {
+  const providedSecret = request.headers.get("x-arch-internal-secret");
+  return providedSecret !== null && providedSecret === env.INTERNAL_BOOTSTRAP_SECRET;
+};
+
+const isPlatformOrTenantRole = (role: string): role is PlatformRole | TenantRole => {
+  return Object.values(PLATFORM_ROLE).includes(role as PlatformRole)
+    || Object.values(TENANT_ROLE).includes(role as TenantRole);
+};
+
+const bootstrapUsers = async (env: AuthBindings, users: ReadonlyArray<BootstrapUserRequest>) => {
+  const repository = new D1IdentityRepository(env.PLATFORM_DB);
+  const results: BootstrapUserResult[] = [];
+
+  for (const user of users) {
+    const email = typeof user.email === "string" ? normalizeEmail(user.email) : "";
+    const name = typeof user.name === "string" ? user.name.trim() : "";
+    const password = typeof user.password === "string" ? user.password : "";
+    const memberships = (user.memberships ?? []).flatMap((membership) => {
+      if (
+        typeof membership.tenantId !== "string"
+        || membership.tenantId.trim().length === 0
+        || typeof membership.role !== "string"
+        || !isPlatformOrTenantRole(membership.role)
+      ) {
+        return [];
+      }
+
+      return [{
+        tenantId: membership.tenantId,
+        role: membership.role
+      }];
+    });
+
+    if (email.length === 0 || name.length === 0 || password.length === 0 || memberships.length === 0) {
+      throw new Error("Each bootstrap user requires email, name, password, and at least one membership.");
+    }
+
+    const existingUser = await getUserByEmail(env, email);
+    const userId = existingUser?.id
+      ?? await createAuthUser(env, { email, name, password }).catch(async (error: unknown) => {
+        const userAfterConflict = await getUserByEmail(env, email);
+        if (userAfterConflict?.id) {
+          return userAfterConflict.id;
+        }
+        throw error;
+      });
+
+    await repository.save({
+      user: {
+        id: userId,
+        email: email as string & { readonly __brand: "EmailAddress" }
+      },
+      memberships: memberships.map((membership) => ({
+        id: ulid(),
+        tenantId: membership.tenantId as string & { readonly __brand: "TenantId" },
+        userId,
+        role: membership.role
+      }))
+    });
+
+    results.push({
+      userId,
+      email,
+      name,
+      password,
+      temporaryPassword: true,
+      memberships
+    });
+  }
+
+  return results;
+};
+
+const resolveRequestedTenantId = (request: Request) => {
+  const url = new URL(request.url);
+  return request.headers.get("x-tenant-id") ?? url.searchParams.get("tenantId");
+};
+
+const getRequestSessionToken = (request: Request) => {
+  return extractBearerToken(request.headers.get("authorization") ?? undefined) ?? getSessionCookie(request.headers);
+};
+
+const getSessionRow = async (env: AuthBindings, token: string) => {
+  return env.PLATFORM_DB.prepare(
+    'SELECT id, token, userId, expiresAt, createdAt FROM "session" WHERE token = ? LIMIT 1'
+  )
+    .bind(token)
+    .first<SessionRow>();
+};
+
+const getUserRow = async (env: AuthBindings, userId: string) => {
+  return env.PLATFORM_DB.prepare('SELECT id, email, name, image FROM "user" WHERE id = ? LIMIT 1')
+    .bind(userId)
+    .first<UserRow>();
+};
+
+const buildAuthorizationContext = async (
+  env: AuthBindings,
+  session: SessionRow,
+  tenantId: string | null | undefined
+) => {
+  const expiresAt = toEpochSeconds(session.expiresAt);
+  if (expiresAt <= Math.floor(Date.now() / 1000)) {
+    return { error: "TOKEN_EXPIRED" as const };
+  }
+
+  const repository = new D1IdentityRepository(env.PLATFORM_DB);
+  const identity = await repository.getByUserId(session.userId);
+  if (identity === null) {
+    return { error: "IDENTITY_NOT_FOUND" as const };
+  }
+
+  const tenantMembership = tenantId
+    ? identity.memberships.find((membership) => membership.tenantId === tenantId)
+    : identity.memberships.find((membership) => membership.role !== PLATFORM_ROLE.PLATFORM_ADMIN) ?? null;
+
+  const platformMembership = identity.memberships.find(
+    (membership) => membership.role === PLATFORM_ROLE.PLATFORM_ADMIN
+  );
+
+  if (tenantId !== undefined && tenantId !== null && tenantMembership === undefined) {
+    return { error: "TOKEN_TENANT_MISMATCH" as const };
+  }
+
+  const platformRole = platformMembership?.role === PLATFORM_ROLE.PLATFORM_ADMIN ? PLATFORM_ROLE.PLATFORM_ADMIN : null;
+  const tenantRole =
+    tenantMembership !== undefined && tenantMembership !== null && tenantMembership.role !== PLATFORM_ROLE.PLATFORM_ADMIN
+      ? (tenantMembership.role as TenantRole)
+      : null;
+
+  const payload: AuthTokenPayload = {
+    sub: session.userId,
+    sid: session.id,
+    exp: expiresAt,
+    iat: toEpochSeconds(session.createdAt),
+    orgId: tenantId ?? tenantMembership?.tenantId ?? null,
+    tenantId: tenantId ?? tenantMembership?.tenantId ?? null,
+    platformRole,
+    tenantRole,
+    permissions: mergePermissions(
+      [platformRole, tenantRole].filter((role): role is PlatformRole | TenantRole => role !== null)
+    ),
+  };
+
+  return {
+    payload,
+    identity,
+  };
+};
+
+const resolveSessionContext = async (env: AuthBindings, request: Request) => {
+  const token = getRequestSessionToken(request);
+  if (token === null) {
+    return { authenticated: false as const };
+  }
+
+  const session = await getSessionRow(env, token);
+  if (session === null) {
+    return { authenticated: false as const };
+  }
+
+  const tenantId = resolveRequestedTenantId(request);
+  const authorization = await buildAuthorizationContext(env, session, tenantId);
+  if ("error" in authorization) {
+    return {
+      authenticated: false as const,
+      error: authorization.error,
+    };
+  }
+
+  const user = await getUserRow(env, session.userId);
+  return {
+    authenticated: true as const,
+    session,
+    user,
+    identity: authorization.identity,
+    payload: authorization.payload,
+  };
+};
+
 app.get("/health", (c) => c.json({ success: true, data: { service: "auth-worker", status: "ok" } }));
 
-const decodeBase64Url = (input: string): string => {
-  const normalized: string = input.replace(/-/g, "+").replace(/_/g, "/");
-  const paddingLength: number = (4 - (normalized.length % 4)) % 4;
-  const padded: string = normalized + "=".repeat(paddingLength);
-  const bytes: Uint8Array = Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
-  return new TextDecoder().decode(bytes);
-};
+app.all("/api/auth/*", async (c) => {
+  const auth = createAuth(c.env);
+  return auth.handler(c.req.raw);
+});
 
-const decodeTokenPayload = (token: string): AuthTokenPayload | null => {
-  const segments: string[] = token.split(".");
-  if (segments.length !== 3 || segments[1] === undefined) {
-    return null;
+app.get("/api/client/providers", (c) => {
+  const configuration = getAuthConfigurationSummary(c.env);
+  return c.json({
+    success: true,
+    data: {
+      credentialStrategies: configuration.credentialStrategies,
+      socialProviders: configuration.socialProviders,
+      sessionTransports: ["cookie", "bearer"],
+      organizationEnabled: true,
+      adminEnabled: true,
+    },
+  });
+});
+
+app.get("/internal/tenants/:tenantId/auth-configuration", (c) => {
+  return c.json({
+    success: true,
+    data: getAuthConfigurationSummary(c.env, c.req.param("tenantId")),
+  });
+});
+
+app.post("/internal/bootstrap-users", async (c) => {
+  if (!requireInternalBootstrapSecret(c.req.raw, c.env)) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Missing or invalid internal bootstrap secret"
+        }
+      },
+      403
+    );
   }
+
+  const body = (await c.req.json().catch(() => null)) as BootstrapRequestBody | null;
+  if (body?.users === undefined || body.users.length === 0) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "At least one bootstrap user is required"
+        }
+      },
+      400
+    );
+  }
+
   try {
-    const payloadJson: string = decodeBase64Url(segments[1]);
-    const payload = JSON.parse(payloadJson) as Partial<AuthTokenPayload>;
-    if (
-      typeof payload.sub !== "string" ||
-      typeof payload.sid !== "string" ||
-      typeof payload.exp !== "number" ||
-      typeof payload.iat !== "number"
-    ) {
-      return null;
-    }
-    const normalizedPayload: AuthTokenPayload = {
-      sub: payload.sub,
-      sid: payload.sid,
-      exp: payload.exp,
-      iat: payload.iat,
-      orgId: payload.orgId ?? null,
-      tenantId: payload.tenantId ?? null,
-      platformRole: payload.platformRole ?? null,
-      tenantRole: payload.tenantRole ?? null,
-      permissions: Array.isArray(payload.permissions) ? payload.permissions : []
-    };
-    return normalizedPayload;
-  } catch {
-    return null;
+    const results = await bootstrapUsers(c.env, body.users);
+    return c.json({
+      success: true,
+      data: {
+        users: results
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to bootstrap users";
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "BOOTSTRAP_FAILED",
+          message
+        }
+      },
+      400
+    );
   }
-};
+});
 
-const normalizeOptionalUrl = (value: string | null | undefined): string | null => {
-  if (value === undefined || value === null) {
-    return null;
+app.get("/api/client/session", async (c) => {
+  const context = await resolveSessionContext(c.env, c.req.raw);
+  if (!context.authenticated) {
+    return c.json({
+      success: true,
+      data: {
+        authenticated: false,
+        session: null,
+        user: null,
+        memberships: [],
+        authorization: null,
+      },
+    });
   }
-  const normalizedValue = value.trim();
-  if (normalizedValue.length === 0) {
-    return null;
-  }
-  return normalizedValue.endsWith("/") ? normalizedValue.slice(0, -1) : normalizedValue;
-};
 
-const resolveJwksUrl = (authDomain: string | null, explicitJwksUrl: string | null): string | null => {
-  const normalizedJwksUrl = normalizeOptionalUrl(explicitJwksUrl);
-  if (normalizedJwksUrl !== null) {
-    return normalizedJwksUrl;
+  return c.json({
+    success: true,
+    data: {
+      authenticated: true,
+      session: {
+        sessionId: context.session.id,
+        userId: context.session.userId,
+        expiresAt: toEpochSeconds(context.session.expiresAt),
+        issuedAt: toEpochSeconds(context.session.createdAt),
+      },
+      user: {
+        id: context.session.userId,
+        email: context.user?.email ?? context.identity.user.email ?? null,
+        name: context.user?.name ?? null,
+        image: context.user?.image ?? null,
+      },
+      memberships: context.identity.memberships,
+      authorization: context.payload,
+    },
+  });
+});
+
+app.get("/api/client/me", async (c) => {
+  const context = await resolveSessionContext(c.env, c.req.raw);
+  if (!context.authenticated) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Authentication is required",
+        },
+      },
+      401
+    );
   }
-  const normalizedAuthDomain = normalizeOptionalUrl(authDomain);
-  if (normalizedAuthDomain === null) {
-    return null;
-  }
-  return `${normalizedAuthDomain}/.well-known/jwks.json`;
-};
+
+  return c.json({
+    success: true,
+    data: {
+      user: {
+        id: context.session.userId,
+        email: context.user?.email ?? context.identity.user.email ?? null,
+        name: context.user?.name ?? null,
+        image: context.user?.image ?? null,
+      },
+      memberships: context.identity.memberships,
+      authorization: context.payload,
+    },
+  });
+});
 
 app.post("/internal/verify-token", async (c) => {
   const body = (await c.req.json()) as {
     readonly token?: string;
     readonly tenantId?: string | null;
   };
+
   if (body.token === undefined || body.token.length === 0) {
     return c.json(
       {
         success: false,
         error: {
           code: "INVALID_TOKEN",
-          message: "Missing token"
-        }
+          message: "Missing token",
+        },
       },
       400
     );
   }
-  const payload: AuthTokenPayload | null = decodeTokenPayload(body.token);
-  if (payload === null && body.tenantId === null) {
+
+  const session = await getSessionRow(c.env, body.token);
+
+  if (session === null) {
     return c.json(
       {
         success: false,
         error: {
           code: "INVALID_TOKEN",
-          message: "Token payload could not be decoded"
-        }
+          message: "Session token was not found",
+        },
       },
       401
     );
   }
-  let verifiedPayload: AuthTokenPayload | null = payload;
-  if (body.tenantId !== undefined && body.tenantId !== null) {
-    const configRepository = new D1ClerkConfigRepository(c.env.PLATFORM_DB);
-    const config = await configRepository.getByTenantId(body.tenantId);
-    if (config === null) {
+
+  const authorization = await buildAuthorizationContext(c.env, session, body.tenantId);
+  if ("error" in authorization) {
+    if (authorization.error === "TOKEN_EXPIRED") {
       return c.json(
         {
           success: false,
           error: {
-            code: "TENANT_CONFIG_NOT_FOUND",
-            message: "Tenant Clerk configuration is missing"
-          }
-        },
-        404
-      );
-    }
-    const verified = await verifyClerkJwt(body.token, config.jwksUrl);
-    if (!verified.isValid || verified.subject === null || verified.payload === null) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "INVALID_TOKEN",
-            message: verified.reason ?? "Token could not be verified"
-          }
+            code: "TOKEN_EXPIRED",
+            message: "Session token has expired",
+          },
         },
         401
       );
     }
-    verifiedPayload = {
-      sub: verified.subject,
-      sid: (verified.payload.sid as string | undefined) ?? "sid",
-      exp: (verified.payload.exp as number | undefined) ?? Math.floor(Date.now() / 1000) + 300,
-      iat: (verified.payload.iat as number | undefined) ?? Math.floor(Date.now() / 1000),
-      orgId: (verified.payload.org_id as string | undefined) ?? null,
-      tenantId: body.tenantId,
-      platformRole: null,
-      tenantRole: null,
-      permissions: []
-    };
-  }
-  if (verifiedPayload === null) {
+
+    if (authorization.error === "TOKEN_TENANT_MISMATCH") {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "TOKEN_TENANT_MISMATCH",
+            message: "Session token is not authorized for the requested tenant",
+          },
+        },
+        403
+      );
+    }
+
     return c.json(
       {
         success: false,
         error: {
-          code: "INVALID_TOKEN",
-          message: "Token payload could not be normalized"
-        }
+          code: "NOT_FOUND",
+          message: "Identity was not found",
+        },
       },
-      401
+      404
     );
   }
-  const nowEpochSeconds: number = Math.floor(Date.now() / 1000);
-  if (verifiedPayload.exp <= nowEpochSeconds) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "TOKEN_EXPIRED",
-          message: "Token has expired"
-        }
-      },
-      401
-    );
-  }
-  if (
-    body.tenantId !== undefined &&
-    body.tenantId !== null &&
-    verifiedPayload.tenantId !== null &&
-    verifiedPayload.tenantId !== body.tenantId
-  ) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "TOKEN_TENANT_MISMATCH",
-          message: "Token tenant does not match request tenant"
-        }
-      },
-      403
-    );
-  }
+
   return c.json({
     success: true,
     data: {
-      subject: verifiedPayload.sub,
-      payload: verifiedPayload
-    }
+      subject: authorization.payload.sub,
+      payload: authorization.payload,
+    },
   });
 });
 
@@ -208,134 +612,8 @@ app.get("/internal/users/:userId/profile", async (c) => {
     data: {
       userId: identity.user.id,
       email: identity.user.email,
-      memberships: identity.memberships
-    }
-  });
-});
-
-app.get("/internal/tenants/:tenantId/clerk-config", async (c) => {
-  const repository = new D1ClerkConfigRepository(c.env.PLATFORM_DB);
-  const config = await repository.getByTenantId(c.req.param("tenantId"));
-  if (config === null) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "NOT_FOUND",
-          message: "Clerk configuration not found"
-        }
-      },
-      404
-    );
-  }
-  return c.json({
-    success: true,
-    data: config
-  });
-});
-
-app.post("/internal/tenants/:tenantId/configure-clerk-keys", async (c) => {
-  const tenantId = c.req.param("tenantId");
-  const body = (await c.req.json()) as {
-    readonly clerkPublishableKey: string;
-    readonly clerkSecretKey?: string;
-    readonly clerkWebhookSecret?: string;
-    readonly clerkAuthDomain?: string | null;
-    readonly clerkProxyUrl?: string | null;
-    readonly clerkJwksUrl?: string | null;
-  };
-  const repository = new D1ClerkConfigRepository(c.env.PLATFORM_DB);
-  const existingConfig = await repository.getByTenantId(tenantId);
-  const normalizedSecretKey = body.clerkSecretKey?.trim() ?? "";
-  const normalizedWebhookSecret = body.clerkWebhookSecret?.trim() ?? "";
-  const encryptedSecretKey =
-    normalizedSecretKey.length > 0
-      ? (
-        await configureTenantClerkKeys({
-          tenantId,
-          clerkPublishableKey: body.clerkPublishableKey,
-          clerkSecretKey: normalizedSecretKey,
-          clerkWebhookSecret: normalizedWebhookSecret.length > 0 ? normalizedWebhookSecret : existingConfig?.webhookSecret ?? "",
-          encryptionSecret: c.env.CLERK_KEY_ENCRYPTION_SECRET
-        })
-      ).encryptedSecretKey
-      : existingConfig?.encryptedSecretKey;
-  const webhookSecret =
-    normalizedWebhookSecret.length > 0 ? normalizedWebhookSecret : (existingConfig?.webhookSecret ?? null);
-  if (encryptedSecretKey === undefined || webhookSecret === null) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "MISSING_SECRET_CONFIGURATION",
-          message: "Clerk secret key and webhook secret are required for initial configuration"
-        }
-      },
-      400
-    );
-  }
-  const authDomain = normalizeOptionalUrl(body.clerkAuthDomain ?? existingConfig?.authDomain ?? null);
-  const proxyUrl = normalizeOptionalUrl(body.clerkProxyUrl ?? existingConfig?.proxyUrl ?? null);
-  const jwksUrl = resolveJwksUrl(authDomain, body.clerkJwksUrl ?? existingConfig?.jwksUrl ?? null);
-  if (jwksUrl === null) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "JWKS_URL_REQUIRED",
-          message: "Provide either a Clerk auth domain or an explicit JWKS URL"
-        }
-      },
-      400
-    );
-  }
-  await repository.save({
-    id: `${tenantId}:clerk-config`,
-    tenantId: tenantId as string & { readonly __brand: "TenantId" },
-    publishableKey: body.clerkPublishableKey,
-    encryptedSecretKey,
-    webhookSecret,
-    authDomain,
-    proxyUrl,
-    jwksUrl
-  });
-  return c.json({
-    success: true,
-    data: {
-      configured: true,
-      encryptedSecretKey,
-      authDomain,
-      proxyUrl,
-      jwksUrl
-    }
-  });
-});
-
-app.post("/api/webhooks/clerk", async (c) => {
-  const tenantId: string | undefined = c.req.header("x-tenant-id") ?? c.req.query("tenantId") ?? undefined;
-  if (tenantId === undefined || tenantId.length === 0) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "TENANT_ID_REQUIRED",
-          message: "Tenant id is required in x-tenant-id header or tenantId query"
-        }
-      },
-      400
-    );
-  }
-  const configRepository = new D1ClerkConfigRepository(c.env.PLATFORM_DB);
-  const config = await configRepository.getByTenantId(tenantId);
-  if (config === null) {
-    return c.json({ success: false, error: { code: "NOT_FOUND", message: "Tenant Clerk config not found" } }, 404);
-  }
-  const event = await parseClerkWebhook(c.req.raw.clone(), config.webhookSecret);
-  return c.json({
-    success: true,
-    data: {
-      type: event.type
-    }
+      memberships: identity.memberships,
+    },
   });
 });
 

@@ -28,7 +28,6 @@ export class D1IdentityRepository implements IdentityRepository {
     return {
       user: {
         id: user.id,
-        clerkUserId: user.clerkUserId as string & { readonly __brand: "ClerkUserId" },
         email: (user.primaryEmail as string | null) as (string & { readonly __brand: "EmailAddress" }) | null
       },
       memberships: membershipRows.map((row) => ({
@@ -51,7 +50,6 @@ export class D1IdentityRepository implements IdentityRepository {
       .insert(globalUsersTable)
       .values({
         id: identity.user.id,
-        clerkUserId: identity.user.clerkUserId,
         primaryEmail: identity.user.email,
         firstName: null,
         lastName: null,
@@ -62,7 +60,6 @@ export class D1IdentityRepository implements IdentityRepository {
       .onConflictDoUpdate({
         target: globalUsersTable.id,
         set: {
-          clerkUserId: identity.user.clerkUserId,
           primaryEmail: identity.user.email,
           updatedAt: now
         }
@@ -80,7 +77,7 @@ export class D1IdentityRepository implements IdentityRepository {
           updatedAt: now
         })
         .onConflictDoUpdate({
-          target: tenantMembershipsTable.id,
+          target: [tenantMembershipsTable.tenantId, tenantMembershipsTable.globalUserId],
           set: {
             role: membership.role,
             status: "ACTIVE",

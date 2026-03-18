@@ -15,7 +15,8 @@
     "@arch/cloudflare-bindings": "workspace:*",
     "@arch/db-schema": "workspace:*",
     "@arch/infrastructure-sdk": "workspace:*",
-    "drizzle-orm": "^0.39.0",
-    "hono": "^4.7.0"
+    "drizzle-orm": "^0.41.0",
+    "hono": "^4.7.0",
+    "ulid": "^2.3.0"
   }
 }
