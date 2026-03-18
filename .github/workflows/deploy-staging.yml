@@ -3,12 +3,32 @@ name: Deploy Staging
 on:
   push:
     branches: [staging]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
 
 jobs:
   deploy:
     name: Deploy To Staging
     runs-on: ubuntu-latest
     environment: staging
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+      INTERNAL_BOOTSTRAP_SECRET: ${{ secrets.INTERNAL_BOOTSTRAP_SECRET }}
+      AUTH_WORKER_URL: ${{ vars.AUTH_WORKER_URL }}
+      AUTH_WORKER_INTERNAL_URL: ${{ vars.AUTH_WORKER_INTERNAL_URL }}
+      TENANT_WORKER_INTERNAL_URL: ${{ vars.TENANT_WORKER_INTERNAL_URL }}
+      BETTER_AUTH_GOOGLE_CLIENT_ID: ${{ secrets.BETTER_AUTH_GOOGLE_CLIENT_ID }}
+      BETTER_AUTH_GOOGLE_CLIENT_SECRET: ${{ secrets.BETTER_AUTH_GOOGLE_CLIENT_SECRET }}
+      BETTER_AUTH_FACEBOOK_CLIENT_ID: ${{ secrets.BETTER_AUTH_FACEBOOK_CLIENT_ID }}
+      BETTER_AUTH_FACEBOOK_CLIENT_SECRET: ${{ secrets.BETTER_AUTH_FACEBOOK_CLIENT_SECRET }}
+      BETTER_AUTH_TRUSTED_ORIGINS: ${{ vars.BETTER_AUTH_TRUSTED_ORIGINS }}
+      BETTER_AUTH_COOKIE_DOMAIN: ${{ vars.BETTER_AUTH_COOKIE_DOMAIN }}
+      PHONE_OTP_WEBHOOK_URL: ${{ secrets.PHONE_OTP_WEBHOOK_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -17,14 +37,69 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm turbo build
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - name: Provision Shared Platform Resources
+        run: pnpm provision:platform
+      - name: Sync Runtime Secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          put_secret() {
+            local value="$1"
+            local name="$2"
+            local config="$3"
+
+            if [[ -z "$value" ]]; then
+              return
+            fi
+
+            printf '%s' "$value" | pnpm dlx wrangler secret put "$name" --config "$config"
+          }
+
+          put_secret "$BETTER_AUTH_SECRET" BETTER_AUTH_SECRET apps/auth-worker/wrangler.jsonc
+          put_secret "$INTERNAL_BOOTSTRAP_SECRET" INTERNAL_BOOTSTRAP_SECRET apps/auth-worker/wrangler.jsonc
+          put_secret "$INTERNAL_BOOTSTRAP_SECRET" INTERNAL_BOOTSTRAP_SECRET apps/tenant-worker/wrangler.jsonc
+          put_secret "$CLOUDFLARE_API_TOKEN" CLOUDFLARE_API_TOKEN apps/tenant-worker/wrangler.jsonc
+          put_secret "$CLOUDFLARE_ACCOUNT_ID" CLOUDFLARE_ACCOUNT_ID apps/tenant-worker/wrangler.jsonc
+          put_secret "$BETTER_AUTH_GOOGLE_CLIENT_ID" BETTER_AUTH_GOOGLE_CLIENT_ID apps/auth-worker/wrangler.jsonc
+          put_secret "$BETTER_AUTH_GOOGLE_CLIENT_SECRET" BETTER_AUTH_GOOGLE_CLIENT_SECRET apps/auth-worker/wrangler.jsonc
+          put_secret "$BETTER_AUTH_FACEBOOK_CLIENT_ID" BETTER_AUTH_FACEBOOK_CLIENT_ID apps/auth-worker/wrangler.jsonc
+          put_secret "$BETTER_AUTH_FACEBOOK_CLIENT_SECRET" BETTER_AUTH_FACEBOOK_CLIENT_SECRET apps/auth-worker/wrangler.jsonc
+          put_secret "$BETTER_AUTH_TRUSTED_ORIGINS" BETTER_AUTH_TRUSTED_ORIGINS apps/auth-worker/wrangler.jsonc
+          put_secret "$BETTER_AUTH_COOKIE_DOMAIN" BETTER_AUTH_COOKIE_DOMAIN apps/auth-worker/wrangler.jsonc
+          put_secret "$PHONE_OTP_WEBHOOK_URL" PHONE_OTP_WEBHOOK_URL apps/auth-worker/wrangler.jsonc
+          put_secret "$AUTH_WORKER_URL" AUTH_WORKER_URL apps/admin-dashboard/wrangler.jsonc
+          put_secret "$AUTH_WORKER_INTERNAL_URL" AUTH_WORKER_INTERNAL_URL apps/admin-dashboard/wrangler.jsonc
+          put_secret "$TENANT_WORKER_INTERNAL_URL" TENANT_WORKER_INTERNAL_URL apps/admin-dashboard/wrangler.jsonc
+          put_secret "$AUTH_WORKER_URL" AUTH_WORKER_URL apps/storefront/wrangler.jsonc
+          put_secret "$AUTH_WORKER_URL" AUTH_WORKER_URL apps/vendor-dashboard/wrangler.jsonc
       - name: Apply Global Migrations
         run: pnpm --filter=@arch/tooling migrate:global
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
       - name: Apply Tenant Migrations (All)
         run: pnpm --filter=@arch/tooling migrate:tenant -- --all
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      - name: Deploy Workers
+        shell: bash
+        run: |
+          set -euo pipefail
+          for config in \
+            apps/auth-worker/wrangler.jsonc \
+            apps/tenant-worker/wrangler.jsonc \
+            apps/gateway/wrangler.jsonc \
+            apps/catalog-worker/wrangler.jsonc \
+            apps/order-worker/wrangler.jsonc \
+            apps/vendor-worker/wrangler.jsonc \
+            apps/ledger-worker/wrangler.jsonc \
+            apps/cart-durable-object/wrangler.jsonc \
+            apps/inventory-durable-object/wrangler.jsonc \
+            apps/rate-limiter-durable-object/wrangler.jsonc; do
+            pnpm dlx wrangler deploy --config "$config"
+          done
+      - name: Deploy Frontends
+        run: |
+          pnpm --filter @arch/admin-dashboard deploy
+          pnpm --filter @arch/storefront deploy
+          pnpm --filter @arch/vendor-dashboard deploy

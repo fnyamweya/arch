@@ -14,8 +14,6 @@ export interface TenantResources {
   readonly r2BucketName: string;
   readonly queueName: string;
   readonly sentryDsn: string | null;
-  readonly clerkPublishableKey: string;
-  readonly clerkSecretKeyEncrypted: string;
   readonly domains: ReadonlyArray<TenantDomain>;
 }
 

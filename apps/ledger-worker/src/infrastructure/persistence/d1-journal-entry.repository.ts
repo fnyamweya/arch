@@ -76,7 +76,7 @@ export class D1JournalEntryRepository implements JournalEntryRepository {
           accountId: line.accountId,
           debitAmountCents: line.debitAmountCents,
           creditAmountCents: line.creditAmountCents,
-          currencyCode: "USD",
+          currencyCode: "KES",
           description: "journal line"
         })
         .onConflictDoUpdate({

@@ -82,7 +82,7 @@ export const urbanNest = {
     status: "active" as const,
     defaultLocale: "en",
     supportedLocales: ["en", "es", "fr"],
-    primaryDomain: "www.urbannest.com",
+    primaryDomain: "urban-nest.africasokoni.co.ke",
     seoDefaults: { title: "UrbanNest - Modern Home & Lifestyle", description: "Curated home goods and lifestyle essentials for modern living" },
     featureFlags: { darkMode: true, wishlist: true, reviews: true, quickView: true },
     createdAt: now,
@@ -90,8 +90,8 @@ export const urbanNest = {
   },
 
   domainMappings: [
-    { id: id("dm_"), storefrontId: urbanNestSfId, hostname: "www.urbannest.com", isPrimary: true, redirectBehavior: "none" as const, sslStatus: "active" as const, verificationStatus: "verified" as const, createdAt: now, updatedAt: now },
-    { id: id("dm_"), storefrontId: urbanNestSfId, hostname: "urbannest.com", isPrimary: false, redirectBehavior: "permanent" as const, sslStatus: "active" as const, verificationStatus: "verified" as const, createdAt: now, updatedAt: now },
+    { id: id("dm_"), storefrontId: urbanNestSfId, hostname: "urban-nest.africasokoni.co.ke", isPrimary: true, redirectBehavior: "none" as const, sslStatus: "active" as const, verificationStatus: "verified" as const, createdAt: now, updatedAt: now },
+    { id: id("dm_"), storefrontId: urbanNestSfId, hostname: "www.urban-nest.africasokoni.co.ke", isPrimary: false, redirectBehavior: "permanent" as const, sslStatus: "active" as const, verificationStatus: "verified" as const, createdAt: now, updatedAt: now },
   ],
 
   theme: {
@@ -259,7 +259,7 @@ export const voltCart = {
     status: "active" as const,
     defaultLocale: "en",
     supportedLocales: ["en", "de", "ja"],
-    primaryDomain: "www.voltcart.com",
+    primaryDomain: "volt-cart.africasokoni.co.ke",
     seoDefaults: { title: "VoltCart - Premium Electronics", description: "The latest tech and electronics at competitive prices" },
     featureFlags: { darkMode: true, compareTool: true, techSpecs: true, liveChat: true },
     createdAt: now,
@@ -267,7 +267,7 @@ export const voltCart = {
   },
 
   domainMappings: [
-    { id: id("dm_"), storefrontId: voltCartSfId, hostname: "www.voltcart.com", isPrimary: true, redirectBehavior: "none" as const, sslStatus: "active" as const, verificationStatus: "verified" as const, createdAt: now, updatedAt: now },
+    { id: id("dm_"), storefrontId: voltCartSfId, hostname: "volt-cart.africasokoni.co.ke", isPrimary: true, redirectBehavior: "none" as const, sslStatus: "active" as const, verificationStatus: "verified" as const, createdAt: now, updatedAt: now },
   ],
 
   theme: {
@@ -361,7 +361,7 @@ export const greenBasket = {
     status: "active" as const,
     defaultLocale: "en",
     supportedLocales: ["en", "es"],
-    primaryDomain: "www.greenbasket.co",
+    primaryDomain: "green-basket.africasokoni.co.ke",
     seoDefaults: { title: "GreenBasket - Organic & Fresh", description: "Farm-fresh organic groceries delivered to your door" },
     featureFlags: { subscriptions: true, mealPlanner: true, localFarm: true },
     createdAt: now,
@@ -369,7 +369,7 @@ export const greenBasket = {
   },
 
   domainMappings: [
-    { id: id("dm_"), storefrontId: greenBasketSfId, hostname: "www.greenbasket.co", isPrimary: true, redirectBehavior: "none" as const, sslStatus: "active" as const, verificationStatus: "verified" as const, createdAt: now, updatedAt: now },
+    { id: id("dm_"), storefrontId: greenBasketSfId, hostname: "green-basket.africasokoni.co.ke", isPrimary: true, redirectBehavior: "none" as const, sslStatus: "active" as const, verificationStatus: "verified" as const, createdAt: now, updatedAt: now },
   ],
 
   theme: {
@@ -463,7 +463,7 @@ export const atelierOne = {
     status: "active" as const,
     defaultLocale: "en",
     supportedLocales: ["en", "fr", "it", "zh"],
-    primaryDomain: "www.atelierone.com",
+    primaryDomain: "atelier-one.africasokoni.co.ke",
     seoDefaults: { title: "AtelierOne - Luxury Fashion", description: "Exclusive luxury fashion and accessories from the world's finest designers" },
     featureFlags: { vipAccess: true, appointmentBooking: true, virtualTryOn: true, concierge: true },
     createdAt: now,
@@ -471,7 +471,7 @@ export const atelierOne = {
   },
 
   domainMappings: [
-    { id: id("dm_"), storefrontId: atelierOneSfId, hostname: "www.atelierone.com", isPrimary: true, redirectBehavior: "none" as const, sslStatus: "active" as const, verificationStatus: "verified" as const, createdAt: now, updatedAt: now },
+    { id: id("dm_"), storefrontId: atelierOneSfId, hostname: "atelier-one.africasokoni.co.ke", isPrimary: true, redirectBehavior: "none" as const, sslStatus: "active" as const, verificationStatus: "verified" as const, createdAt: now, updatedAt: now },
     { id: id("dm_"), storefrontId: atelierOneSfId, hostname: "atelierone.com", isPrimary: false, redirectBehavior: "permanent" as const, sslStatus: "active" as const, verificationStatus: "verified" as const, createdAt: now, updatedAt: now },
     { id: id("dm_"), storefrontId: atelierOneSfId, hostname: "fr.atelierone.com", isPrimary: false, redirectBehavior: "none" as const, sslStatus: "active" as const, verificationStatus: "verified" as const, createdAt: now, updatedAt: now },
   ],

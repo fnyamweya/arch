@@ -37,9 +37,22 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo typecheck
 
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo test
+
   build:
     name: Build All Packages And Apps
-    needs: [lint, typecheck]
+    needs: [lint, typecheck, test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,7 +79,7 @@ jobs:
 
   ci-gate:
     name: CI Gate (All Checks Must Pass)
-    needs: [lint, typecheck, build, migration-validate]
+    needs: [lint, typecheck, test, build, migration-validate]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -74,6 +87,7 @@ jobs:
         run: |
           if [ "${{ needs.lint.result }}" != "success" ] || \
              [ "${{ needs.typecheck.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
              [ "${{ needs.build.result }}" != "success" ] || \
              [ "${{ needs.migration-validate.result }}" != "success" ]; then
             echo "CI Gate FAILED"

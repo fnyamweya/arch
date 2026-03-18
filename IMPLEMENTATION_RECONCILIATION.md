@@ -36,7 +36,7 @@ This checklist reconciles the target architecture in `SKYVER_COMMERCE_AGENT_PROM
   - initial unit tests for critical financial and pricing services
 - Persistence depth increased:
   - placeholder repositories replaced with Drizzle D1 adapters in:
-    - auth worker (`identity`, `clerk-config`)
+    - auth worker (`identity`, Better Auth sync)
     - tenant worker (`tenant`)
     - catalog worker (`product`)
     - order worker (`order`)
@@ -48,9 +48,9 @@ This checklist reconciles the target architecture in `SKYVER_COMMERCE_AGENT_PROM
   - added `packages/ui-kit` with reusable component exports
   - expanded `packages/api-contracts` into domain folders for auth/catalog/orders/vendors/tenants/ledger
 - Security integration depth increased:
-  - added Clerk key encryption/decryption utility (Web Crypto AES-GCM)
+  - centralized Better Auth session handling and normalized client-facing auth APIs
   - added webhook signature verification via `svix`
-  - added internal endpoint to configure encrypted tenant Clerk keys and persist configuration
+  - added internal auth bootstrap endpoint for tenant onboarding and membership seeding
 - Test depth increased:
   - added gateway integration test scaffold
   - added auth encryption test
@@ -116,7 +116,7 @@ This checklist reconciles the target architecture in `SKYVER_COMMERCE_AGENT_PROM
   - Some domain operations and analytics/report handlers are still simplified.
 - Gateway middleware and routing:
   - Routes, middleware chain, auth delegation, tenant resolution, service proxying, and rate limiting are implemented.
-  - Clerk verification is still payload-oriented in current implementation and should be replaced with full Clerk/JWKS verification.
+  - Better Auth bearer-token verification is centralized in `auth-worker`, but broader production hardening and lifecycle coverage still need expansion.
 - Persistence adapters:
   - Drizzle repository adapters are implemented across bounded contexts.
   - Mapping depth still needs richer entity reconstruction in some contexts.
@@ -127,12 +127,12 @@ This checklist reconciles the target architecture in `SKYVER_COMMERCE_AGENT_PROM
 ## Remaining Work
 
 - Full external integration hardening:
-  - Replace token payload decoding with full Clerk JWT verification against tenant JWKS.
+  - Extend Better Auth hardening around bootstrap flows, credential rotation, and environment secret management.
   - Configure real Cloudflare resource IDs and secrets per environment.
   - Replace placeholder runtime vars in `wrangler.jsonc` with managed secrets/bindings.
 - Auth integration details:
   - Webhook signature validation via `svix`
-  - Encrypted tenant Clerk secret key lifecycle handling (create/rotate/revoke/audit).
+  - Generated-password rotation and onboarding audit coverage for internal bootstrap flows.
 - Observability integration details:
   - Full Sentry SDK integration (`@sentry/cloudflare`, `@sentry/nextjs`) instead of runtime fallback adapter.
   - Per-tenant DSN selection and OTLP trace/log export
@@ -151,7 +151,7 @@ This checklist reconciles the target architecture in `SKYVER_COMMERCE_AGENT_PROM
 
 1. Productionize gateway auth + tenant resolution + error envelope middleware
 2. Replace placeholder repositories with real Drizzle implementations
-3. Implement Clerk integration (JWT verify, webhook verify, tenant key encryption flow)
+3. Harden Better Auth bootstrap, token verification, and webhook flows
 4. Implement ledger invariants with tests first
 5. Add worker integration tests for tenant isolation and route auth guards
 6. Expand frontend feature implementations from route stubs to functional modules

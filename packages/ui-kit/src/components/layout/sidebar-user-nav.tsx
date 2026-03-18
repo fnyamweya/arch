@@ -8,7 +8,6 @@ import {
     IconSettings,
     IconUserCircle,
 } from "@tabler/icons-react";
-import { SignOutButton, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import {
     DropdownMenu,
@@ -21,6 +20,7 @@ import {
 } from "../ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 import { UserAvatarProfile } from "./user-avatar-profile";
+import { authClient } from "../auth/auth-client";
 
 interface SidebarUserNavProps {
     readonly profilePath?: string;
@@ -33,12 +33,32 @@ export function SidebarUserNav({
     settingsPath,
     signInPath = "/sign-in",
 }: SidebarUserNavProps) {
-    const { user } = useUser();
+    const { data: session } = authClient.useSession();
     const router = useRouter();
+    const [isSigningOut, setIsSigningOut] = React.useState(false);
+
+    const user = session?.user;
 
     if (!user) {
         return null;
     }
+
+    const avatarUser = {
+        imageUrl: user.image ?? undefined,
+        fullName: user.name ?? null,
+        emailAddresses: user.email ? [{ emailAddress: user.email }] : [],
+    };
+
+    const handleSignOut = async () => {
+        setIsSigningOut(true);
+        try {
+            await authClient.signOut();
+        } finally {
+            router.push(signInPath);
+            router.refresh();
+            setIsSigningOut(false);
+        }
+    };
 
     return (
         <SidebarMenu>
@@ -52,7 +72,7 @@ export function SidebarUserNav({
                             <UserAvatarProfile
                                 className="h-8 w-8 rounded-lg"
                                 showInfo
-                                user={user}
+                                user={avatarUser}
                             />
                             <IconChevronsDown className="ml-auto size-4" />
                         </SidebarMenuButton>
@@ -68,7 +88,7 @@ export function SidebarUserNav({
                                 <UserAvatarProfile
                                     className="h-8 w-8 rounded-lg"
                                     showInfo
-                                    user={user}
+                                    user={avatarUser}
                                 />
                             </div>
                         </DropdownMenuLabel>
@@ -92,9 +112,9 @@ export function SidebarUserNav({
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleSignOut} disabled={isSigningOut}>
                             <IconLogout className="mr-2 h-4 w-4" />
-                            <SignOutButton redirectUrl={signInPath} />
+                            {isSigningOut ? "Signing out..." : "Sign out"}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

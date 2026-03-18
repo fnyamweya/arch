@@ -542,10 +542,10 @@ function generateOpenApiSpec() {
   return {
     openapi: "3.1.0",
     info: {
-      title: "Storefront Management API",
-      description: "Multi-tenant storefront configuration, theming, and content management API",
+      title: "Africa Sokoni Storefront Management API",
+      description: "Multi-tenant storefront configuration, theming, and content management API for africasokoni.co.ke storefronts.",
       version: "1.0.0",
-      contact: { name: "Arch Platform" },
+      contact: { name: "Africa Sokoni Platform" },
     },
     servers: [{ url: "/api/v1", description: "API base" }],
     security: [{ tenantHeader: [] }],

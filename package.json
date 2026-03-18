@@ -8,6 +8,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev --concurrency 15",
     "dev:clean": "node ./tooling/scripts/cleanup-dev-ports.mjs",
+    "provision:platform": "pnpm --filter @arch/tooling provision:platform",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test"
@@ -26,8 +27,6 @@
     "wrangler": "^4.75.0"
   },
   "dependencies": {
-    "@clerk/nextjs": "^7.0.5",
-    "@clerk/themes": "^2.4.57",
     "@hono/swagger-ui": "^0.6.1",
     "@hono/zod-openapi": "^1.2.2",
     "@radix-ui/react-avatar": "^1.1.11",

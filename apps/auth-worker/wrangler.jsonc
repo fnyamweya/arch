@@ -16,7 +16,6 @@
     }
   ],
   "vars": {
-    "PLATFORM_SENTRY_DSN": "https://example@sentry.io/1",
-    "CLERK_KEY_ENCRYPTION_SECRET": "replace-with-secret"
+    "PLATFORM_SENTRY_DSN": "https://example@sentry.io/1"
   }
 }

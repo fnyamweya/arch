@@ -3,10 +3,10 @@ import type { OpenAPIV3 } from "../openapi/types";
 const bearerAuth: OpenAPIV3.SecuritySchemeObject = {
   type: "http",
   scheme: "bearer",
-  bearerFormat: "JWT",
+  bearerFormat: "Session Token",
   description:
-    "Clerk-issued JWT. Include as `Authorization: Bearer <token>`. " +
-    "The gateway verifies the token via the Auth Worker before proxying to protected services."
+    "Platform-issued Better Auth session token. Include as `Authorization: Bearer <token>`. " +
+    "The gateway verifies the session token via the Auth Worker before proxying to protected services."
 };
 
 const tenantHeader: OpenAPIV3.ParameterObject = {
@@ -14,10 +14,17 @@ const tenantHeader: OpenAPIV3.ParameterObject = {
   in: "header",
   required: true,
   description:
-    "Tenant is resolved from the request hostname (e.g. `tenant-a.archcommerce.com`). " +
+    "Tenant is resolved from the request hostname (e.g. `tenant-a.africasokoni.co.ke`). " +
     "The gateway resolves the tenant context automatically.",
-  schema: { type: "string", example: "tenant-a.archcommerce.com" }
+  schema: { type: "string", example: "tenant-a.africasokoni.co.ke" }
 };
+
+const ulidSchema = (description: string, example = "01JPGGGF0K8C9Q8D6Q8R7F7A1S"): OpenAPIV3.SchemaObject => ({
+  type: "string",
+  pattern: "^[0-9A-HJKMNP-TV-Z]{26}$",
+  example,
+  description
+});
 
 // ---------------------------------------------------------------------------
 // Shared schemas
@@ -62,7 +69,7 @@ const AuthTokenPayloadSchema: OpenAPIV3.SchemaObject = {
     sid: { type: "string", description: "Session ID" },
     exp: { type: "integer", description: "Expiration (epoch seconds)" },
     iat: { type: "integer", description: "Issued at (epoch seconds)" },
-    orgId: { type: "string", nullable: true, description: "Clerk Organization ID" },
+    orgId: { type: "string", nullable: true, description: "Active organization or tenant identifier" },
     tenantId: { type: "string", nullable: true, description: "Tenant context" },
     platformRole: {
       type: "string",
@@ -115,7 +122,7 @@ const OrderResponseSchema: OpenAPIV3.SchemaObject = {
       enum: ["PENDING", "CONFIRMED", "FULFILLED", "CANCELLED", "REFUNDED"]
     },
     totalAmountCents: { type: "integer", example: 4999 },
-    currencyCode: { type: "string", example: "USD" }
+    currencyCode: { type: "string", example: "KES" }
   }
 };
 
@@ -133,13 +140,12 @@ const TenantResponseSchema: OpenAPIV3.SchemaObject = {
   type: "object",
   required: ["tenantId", "tenantSlug", "tenantDomain"],
   properties: {
-    tenantId: { type: "string", format: "uuid" },
+    tenantId: ulidSchema("ULID generated for the tenant during onboarding."),
     tenantSlug: { type: "string", example: "tenant-a" },
-    tenantDomain: { type: "string", example: "tenant-a.archcommerce.com" },
+    tenantDomain: { type: "string", example: "tenant-a.africasokoni.co.ke" },
     displayName: { type: "string", example: "Tenant A" },
     status: { type: "string", enum: ["ACTIVE", "SUSPENDED", "PROVISIONING"] },
-    sentryDsn: { type: "string", nullable: true },
-    clerkPublishableKey: { type: "string", nullable: true }
+    sentryDsn: { type: "string", nullable: true }
   }
 };
 
@@ -252,17 +258,17 @@ const errorResponses = (codes: number[]): Record<string, OpenAPIV3.ResponseObjec
 export const openApiSpec: OpenAPIV3.Document = {
   openapi: "3.0.3",
   info: {
-    title: "Arch Commerce Platform API",
+    title: "Africa Sokoni Commerce Platform API",
     version: "0.1.0",
     description:
       "Multi-tenant SaaS commerce platform API. " +
       "Requests are routed through an API Gateway which handles tenant resolution, " +
-      "rate limiting, CORS, and JWT authentication before proxying to isolated microservices.\n\n" +
+      "rate limiting, CORS, and session authentication before proxying to isolated microservices.\n\n" +
       "## Authentication\n" +
-      "Protected routes require a **Clerk-issued JWT** in the `Authorization: Bearer <token>` header. " +
-      "The gateway validates the token via the Auth Worker.\n\n" +
+      "Protected routes require a **Better Auth session token** in the `Authorization: Bearer <token>` header, " +
+      "or a first-party session cookie for browser-oriented auth APIs. The gateway validates bearer tokens via the Auth Worker.\n\n" +
       "## Multi-Tenancy\n" +
-      "Tenant context is resolved from the request hostname (e.g. `tenant-a.archcommerce.com`). " +
+      "Tenant context is resolved from the request hostname (e.g. `tenant-a.africasokoni.co.ke`). " +
       "Each tenant has isolated databases, caches, and event queues.\n\n" +
       "## Rate Limiting\n" +
       "All endpoints are rate-limited at **120 requests per 60 seconds** per tenant+IP combination. " +
@@ -271,11 +277,11 @@ export const openApiSpec: OpenAPIV3.Document = {
       "All responses follow a standard envelope: `{success, data}` on success or `{success, error}` on failure."
   },
   servers: [
-    { url: "https://{tenant}.archcommerce.com", description: "Production", variables: { tenant: { default: "demo" } } },
+    { url: "https://{tenant}.africasokoni.co.ke", description: "Production", variables: { tenant: { default: "demo" } } },
     { url: "http://localhost:8787", description: "Local development" }
   ],
   tags: [
-    { name: "Auth", description: "Authentication, token verification, and Clerk webhook handling" },
+    { name: "Auth", description: "Authentication, session inspection, and token verification" },
     { name: "Catalog", description: "Product catalog management (requires auth)" },
     { name: "Storefront", description: "Public storefront endpoints (read-only catalog)" },
     { name: "Orders", description: "Order lifecycle management (requires auth)" },
@@ -301,15 +307,15 @@ export const openApiSpec: OpenAPIV3.Document = {
       post: {
         operationId: "verifyToken",
         tags: ["Auth"],
-        summary: "Verify a Clerk JWT token",
+        summary: "Verify a Better Auth session token",
         description:
           "Internal endpoint used by the gateway's auth guard middleware. " +
-          "Decodes and verifies a JWT, optionally validating against a specific tenant's Clerk config.",
+          "Validates a Better Auth session token and normalizes it into the platform authorization payload.",
         requestBody: jsonBody({
           type: "object",
           required: ["token"],
           properties: {
-            token: { type: "string", description: "Clerk JWT" },
+            token: { type: "string", description: "Better Auth session token" },
             tenantId: { type: "string", nullable: true, description: "Optional tenant to verify against" }
           }
         }),
@@ -323,6 +329,170 @@ export const openApiSpec: OpenAPIV3.Document = {
             }
           })),
           ...errorResponses([400, 401, 404])
+        }
+      }
+    },
+    "/auth/api/client/providers": {
+      get: {
+        operationId: "getAuthProviders",
+        tags: ["Auth"],
+        summary: "Get client auth capabilities",
+        description: "Returns the enabled credential strategies, social providers, and session transports exposed by the auth worker.",
+        responses: {
+          "200": jsonResponse("Auth providers", successWrap({
+            type: "object",
+            required: ["credentialStrategies", "socialProviders", "sessionTransports", "organizationEnabled", "adminEnabled"],
+            properties: {
+              credentialStrategies: {
+                type: "array",
+                items: { type: "string", enum: ["email", "username", "phone"] }
+              },
+              socialProviders: {
+                type: "array",
+                items: { type: "string", enum: ["google", "facebook"] }
+              },
+              sessionTransports: {
+                type: "array",
+                items: { type: "string", enum: ["cookie", "bearer"] }
+              },
+              organizationEnabled: { type: "boolean" },
+              adminEnabled: { type: "boolean" }
+            }
+          }))
+        }
+      }
+    },
+    "/auth/api/client/session": {
+      get: {
+        operationId: "getClientSession",
+        tags: ["Auth"],
+        summary: "Resolve the current client session",
+        description:
+          "Resolves the current user session from a first-party session cookie or bearer token and returns normalized platform authorization data.",
+        parameters: [
+          { name: "tenantId", in: "query", required: false, schema: { type: "string" }, description: "Optional tenant context override" }
+        ],
+        responses: {
+          "200": jsonResponse("Session state", successWrap({
+            type: "object",
+            required: ["authenticated", "session", "user", "memberships", "authorization"],
+            properties: {
+              authenticated: { type: "boolean" },
+              session: {
+                type: "object",
+                nullable: true,
+                required: ["sessionId", "userId", "expiresAt", "issuedAt"],
+                properties: {
+                  sessionId: { type: "string" },
+                  userId: { type: "string" },
+                  expiresAt: { type: "integer" },
+                  issuedAt: { type: "integer" }
+                }
+              },
+              user: {
+                type: "object",
+                nullable: true,
+                required: ["id", "email", "name", "image"],
+                properties: {
+                  id: { type: "string" },
+                  email: { type: "string", nullable: true },
+                  name: { type: "string", nullable: true },
+                  image: { type: "string", nullable: true }
+                }
+              },
+              memberships: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["id", "tenantId", "userId", "role"],
+                  properties: {
+                    id: { type: "string" },
+                    tenantId: { type: "string" },
+                    userId: { type: "string" },
+                    role: { type: "string", enum: ["PLATFORM_ADMIN", "TENANT_ADMIN", "VENDOR_OWNER", "VENDOR_STAFF", "CUSTOMER"] }
+                  }
+                }
+              },
+              authorization: {
+                type: "object",
+                nullable: true,
+                required: ["sub", "sid", "exp", "iat", "orgId", "tenantId", "platformRole", "tenantRole", "permissions"],
+                properties: {
+                  sub: { type: "string" },
+                  sid: { type: "string" },
+                  exp: { type: "integer" },
+                  iat: { type: "integer" },
+                  orgId: { type: "string", nullable: true },
+                  tenantId: { type: "string", nullable: true },
+                  platformRole: { type: "string", nullable: true, enum: ["PLATFORM_ADMIN"] },
+                  tenantRole: {
+                    type: "string",
+                    nullable: true,
+                    enum: ["TENANT_ADMIN", "VENDOR_OWNER", "VENDOR_STAFF", "CUSTOMER"]
+                  },
+                  permissions: {
+                    type: "array",
+                    items: {
+                      type: "string",
+                      enum: [
+                        "manage:tenants",
+                        "manage:tenant-config",
+                        "manage:vendors",
+                        "manage:products",
+                        "manage:orders",
+                        "view:ledger",
+                        "manage:ledger"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }))
+        }
+      }
+    },
+    "/auth/api/client/me": {
+      get: {
+        operationId: "getClientProfile",
+        tags: ["Auth"],
+        summary: "Get the authenticated client profile",
+        description: "Returns the authenticated user, memberships, and normalized authorization payload.",
+        parameters: [
+          { name: "tenantId", in: "query", required: false, schema: { type: "string" }, description: "Optional tenant context override" }
+        ],
+        responses: {
+          "200": jsonResponse("Authenticated profile", successWrap({
+            type: "object",
+            required: ["user", "memberships", "authorization"],
+            properties: {
+              user: {
+                type: "object",
+                required: ["id", "email", "name", "image"],
+                properties: {
+                  id: { type: "string" },
+                  email: { type: "string", nullable: true },
+                  name: { type: "string", nullable: true },
+                  image: { type: "string", nullable: true }
+                }
+              },
+              memberships: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["id", "tenantId", "userId", "role"],
+                  properties: {
+                    id: { type: "string" },
+                    tenantId: { type: "string" },
+                    userId: { type: "string" },
+                    role: { type: "string", enum: ["PLATFORM_ADMIN", "TENANT_ADMIN", "VENDOR_OWNER", "VENDOR_STAFF", "CUSTOMER"] }
+                  }
+                }
+              },
+              authorization: { $ref: "#/components/schemas/AuthTokenPayload" }
+            }
+          })),
+          ...errorResponses([401])
         }
       }
     },
@@ -352,80 +522,6 @@ export const openApiSpec: OpenAPIV3.Document = {
             }
           })),
           ...errorResponses([404])
-        }
-      }
-    },
-    "/auth/internal/tenants/{tenantId}/clerk-config": {
-      get: {
-        operationId: "getTenantClerkConfig",
-        tags: ["Auth"],
-        summary: "Get Clerk configuration for a tenant",
-        parameters: [{ name: "tenantId", in: "path", required: true, schema: { type: "string" } }],
-        responses: {
-          "200": jsonResponse("Clerk configuration", successWrap({
-            type: "object",
-            properties: {
-              id: { type: "string" },
-              tenantId: { type: "string" },
-              publishableKey: { type: "string" },
-              encryptedSecretKey: { type: "string" },
-              webhookSecret: { type: "string" },
-              jwksUrl: { type: "string", format: "uri" }
-            }
-          })),
-          ...errorResponses([404])
-        }
-      }
-    },
-    "/auth/internal/tenants/{tenantId}/configure-clerk-keys": {
-      post: {
-        operationId: "configureTenantClerkKeys",
-        tags: ["Auth"],
-        summary: "Configure Clerk API keys for a tenant",
-        parameters: [{ name: "tenantId", in: "path", required: true, schema: { type: "string" } }],
-        requestBody: jsonBody({
-          type: "object",
-          required: ["clerkPublishableKey", "clerkSecretKey", "clerkWebhookSecret"],
-          properties: {
-            clerkPublishableKey: { type: "string" },
-            clerkSecretKey: { type: "string" },
-            clerkWebhookSecret: { type: "string" }
-          }
-        }),
-        responses: {
-          "200": jsonResponse("Keys configured", successWrap({
-            type: "object",
-            properties: {
-              encryptedSecretKey: { type: "string" },
-              jwksUrl: { type: "string", format: "uri" }
-            }
-          })),
-          ...errorResponses([400])
-        }
-      }
-    },
-    "/auth/api/webhooks/clerk": {
-      post: {
-        operationId: "handleClerkWebhook",
-        tags: ["Auth"],
-        summary: "Handle Clerk webhook events",
-        description: "Requires `x-tenant-id` header or `tenantId` query parameter. Verified using svix signature headers.",
-        parameters: [
-          { name: "x-tenant-id", in: "header", schema: { type: "string" }, description: "Tenant ID for webhook context" },
-          { name: "tenantId", in: "query", schema: { type: "string" }, description: "Alternative to x-tenant-id header" }
-        ],
-        requestBody: {
-          required: true,
-          content: { "application/json": { schema: { type: "object", description: "Clerk webhook event payload" } } }
-        },
-        responses: {
-          "200": jsonResponse("Webhook processed", successWrap({
-            type: "object",
-            properties: {
-              type: { type: "string", description: "Clerk event type", example: "user.created" }
-            }
-          })),
-          ...errorResponses([400, 404])
         }
       }
     },
@@ -636,7 +732,7 @@ export const openApiSpec: OpenAPIV3.Document = {
           properties: {
             tenantId: { type: "string" },
             customerId: { type: "string" },
-            currencyCode: { type: "string", example: "USD" },
+            currencyCode: { type: "string", example: "KES" },
             totalAmountCents: { type: "integer", example: 4999 }
           }
         }),
@@ -962,21 +1058,101 @@ export const openApiSpec: OpenAPIV3.Document = {
       post: {
         operationId: "provisionTenant",
         tags: ["Admin"],
-        summary: "Provision a new tenant",
-        description: "Creates a new tenant with isolated infrastructure (D1 database, KV namespace, event queue).",
+        summary: "Onboard a new tenant",
+        description:
+          "Creates a tenant with a ULID identifier, provisions its baseline infrastructure footprint, " +
+          "bootstraps Better Auth users, and seeds default vendor/storefront records.",
         security: [{ BearerAuth: [] }],
         requestBody: jsonBody({
           type: "object",
-          required: ["tenantId", "tenantSlug", "displayName", "primaryDomain"],
+          required: ["tenantSlug", "displayName", "primaryDomain", "users"],
           properties: {
-            tenantId: { type: "string", format: "uuid" },
+            tenantId: {
+              ...ulidSchema("Optional explicit ULID. If omitted, the tenant worker generates one."),
+              nullable: true
+            },
             tenantSlug: { type: "string", example: "my-store" },
             displayName: { type: "string", example: "My Store" },
-            primaryDomain: { type: "string", example: "my-store.archcommerce.com" }
+            primaryDomain: { type: "string", example: "my-store.africasokoni.co.ke" },
+            users: {
+              type: "array",
+              minItems: 2,
+              items: {
+                type: "object",
+                required: ["role", "email", "name"],
+                properties: {
+                  role: {
+                    type: "string",
+                    enum: ["PLATFORM_ADMIN", "TENANT_ADMIN", "VENDOR_OWNER", "CUSTOMER"]
+                  },
+                  email: { type: "string", format: "email", example: "admin@example.com" },
+                  name: { type: "string", example: "Alex Morgan" },
+                  password: {
+                    type: "string",
+                    nullable: true,
+                    description: "Optional explicit password. If omitted, onboarding generates a temporary password."
+                  }
+                }
+              }
+            }
           }
         }),
         responses: {
-          "201": jsonResponse("Tenant provisioned", successWrap({ $ref: "#/components/schemas/TenantResponse" })),
+          "201": jsonResponse("Tenant onboarded", successWrap({
+            allOf: [
+              { $ref: "#/components/schemas/TenantResponse" },
+              {
+                type: "object",
+                required: ["infrastructureReady", "seededUsers", "seededResources"],
+                properties: {
+                  infrastructureReady: { type: "boolean", enum: [true] },
+                  seededUsers: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      required: ["role", "userId", "email", "name", "password", "temporaryPassword"],
+                      properties: {
+                        role: {
+                          type: "string",
+                          enum: ["PLATFORM_ADMIN", "TENANT_ADMIN", "VENDOR_OWNER", "CUSTOMER"]
+                        },
+                        userId: { type: "string", description: "Better Auth user id." },
+                        email: { type: "string", format: "email" },
+                        name: { type: "string" },
+                        password: {
+                          type: "string",
+                          description: "Generated or supplied bootstrap password. Returned once at onboarding time."
+                        },
+                        temporaryPassword: { type: "boolean" }
+                      }
+                    }
+                  },
+                  seededResources: {
+                    type: "object",
+                    required: ["vendorId", "storefrontId", "domains", "infrastructure"],
+                    properties: {
+                      vendorId: ulidSchema("Seeded default vendor id."),
+                      storefrontId: ulidSchema("Seeded default storefront id."),
+                      domains: {
+                        type: "array",
+                        items: { type: "string" }
+                      },
+                      infrastructure: {
+                        type: "object",
+                        required: ["d1DatabaseId", "kvNamespaceId", "r2BucketName", "queueName"],
+                        properties: {
+                          d1DatabaseId: { type: "string" },
+                          kvNamespaceId: { type: "string" },
+                          r2BucketName: { type: "string" },
+                          queueName: { type: "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          })),
           ...errorResponses([400, 401, 403, 429])
         }
       }

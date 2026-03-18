@@ -46,6 +46,7 @@
     }
   ],
   "vars": {
+    "PLATFORM_BASE_DOMAIN": "africasokoni.co.ke",
     "PLATFORM_SENTRY_DSN": "https://example@sentry.io/1"
   }
 }

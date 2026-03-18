@@ -22,20 +22,20 @@ export interface ResolvedTenantConfig {
     readonly tenantSlug: string;
     readonly tenantDomain: string;
     readonly sentryDsn?: string | null;
-    readonly clerkPublishableKey?: string | null;
-    readonly clerkAuthDomain?: string | null;
-    readonly clerkProxyUrl?: string | null;
 }
 
-export interface TenantClerkConfig {
-    readonly id: string;
+export interface TenantAuthConfiguration {
+    readonly scope: "platform";
     readonly tenantId: string;
-    readonly publishableKey: string;
-    readonly encryptedSecretKey: string;
-    readonly webhookSecret: string;
-    readonly authDomain: string | null;
-    readonly proxyUrl: string | null;
-    readonly jwksUrl: string;
+    readonly appName: string;
+    readonly tenantScopedConfiguration: boolean;
+    readonly trustedOrigins: ReadonlyArray<string>;
+    readonly cookieDomain: string | null;
+    readonly credentialStrategies: ReadonlyArray<"email" | "username" | "phone">;
+    readonly socialProviders: ReadonlyArray<"google" | "facebook">;
+    readonly organizationEnabled: boolean;
+    readonly adminEnabled: boolean;
+    readonly phoneOtpWebhookConfigured: boolean;
 }
 
 export interface TenantDomainRecord {
@@ -50,6 +50,46 @@ export interface TenantDomainsResponse {
     readonly tenantSlug: string;
     readonly primaryDomain: string;
     readonly domains: ReadonlyArray<TenantDomainRecord>;
+}
+
+export type TenantOnboardingUserRole = "PLATFORM_ADMIN" | "TENANT_ADMIN" | "VENDOR_OWNER" | "CUSTOMER";
+
+export interface TenantOnboardingUserInput {
+    readonly role: TenantOnboardingUserRole;
+    readonly email: string;
+    readonly name: string;
+    readonly password?: string;
+}
+
+export interface SeededTenantUser {
+    readonly role: TenantOnboardingUserRole;
+    readonly userId: string;
+    readonly email: string;
+    readonly name: string;
+    readonly password: string;
+    readonly temporaryPassword: boolean;
+}
+
+export interface TenantOnboardingResponse {
+    readonly tenantId: string;
+    readonly tenantSlug: string;
+    readonly tenantDomain: string;
+    readonly displayName: string;
+    readonly status: "ACTIVE";
+    readonly sentryDsn: string | null;
+    readonly infrastructureReady: boolean;
+    readonly seededUsers: ReadonlyArray<SeededTenantUser>;
+    readonly seededResources: {
+        readonly vendorId: string;
+        readonly storefrontId: string;
+        readonly domains: ReadonlyArray<string>;
+        readonly infrastructure: {
+            readonly d1DatabaseId: string;
+            readonly kvNamespaceId: string;
+            readonly r2BucketName: string;
+            readonly queueName: string;
+        };
+    };
 }
 
 const normalizeOrigin = (value: string | undefined): string | null => {
@@ -125,38 +165,12 @@ export async function resolveTenantForCurrentHost(): Promise<ResolvedTenantConfi
     }
 }
 
-export async function getTenantClerkConfig(tenantId: string): Promise<TenantClerkConfig | null> {
+export async function getTenantAuthConfiguration(tenantId: string): Promise<TenantAuthConfiguration | null> {
     try {
-        return await fetchFromWorker<TenantClerkConfig>(authWorkerOrigin(), `/internal/tenants/${tenantId}/clerk-config`);
+        return await fetchFromWorker<TenantAuthConfiguration>(authWorkerOrigin(), `/internal/tenants/${tenantId}/auth-configuration`);
     } catch {
         return null;
     }
-}
-
-export async function saveTenantClerkConfig(input: {
-    readonly tenantId: string;
-    readonly clerkPublishableKey: string;
-    readonly clerkSecretKey?: string;
-    readonly clerkWebhookSecret?: string;
-    readonly clerkAuthDomain?: string | null;
-    readonly clerkProxyUrl?: string | null;
-    readonly clerkJwksUrl?: string | null;
-}): Promise<void> {
-    const origin = authWorkerOrigin();
-    if (origin === null) {
-        throw new Error("AUTH_WORKER_INTERNAL_URL is not configured.");
-    }
-    await fetchFromWorker(origin, `/internal/tenants/${input.tenantId}/configure-clerk-keys`, {
-        method: "POST",
-        body: JSON.stringify({
-            clerkPublishableKey: input.clerkPublishableKey,
-            clerkSecretKey: input.clerkSecretKey,
-            clerkWebhookSecret: input.clerkWebhookSecret,
-            clerkAuthDomain: input.clerkAuthDomain,
-            clerkProxyUrl: input.clerkProxyUrl,
-            clerkJwksUrl: input.clerkJwksUrl
-        })
-    });
 }
 
 export async function getTenantDomains(tenantId: string): Promise<TenantDomainsResponse | null> {
@@ -208,4 +222,27 @@ export async function deleteTenantDomain(input: {
         method: "POST",
         body: JSON.stringify({ domain: input.domain })
     });
+}
+
+export async function createTenantOnboarding(input: {
+    readonly tenantSlug: string;
+    readonly displayName: string;
+    readonly primaryDomain: string;
+    readonly users: ReadonlyArray<TenantOnboardingUserInput>;
+}): Promise<TenantOnboardingResponse> {
+    const origin = tenantWorkerOrigin();
+    if (origin === null) {
+        throw new Error("TENANT_WORKER_INTERNAL_URL is not configured.");
+    }
+
+    const result = await fetchFromWorker<TenantOnboardingResponse>(origin, "/tenants", {
+        method: "POST",
+        body: JSON.stringify(input)
+    });
+
+    if (result === null) {
+        throw new Error("Tenant worker did not return onboarding data.");
+    }
+
+    return result;
 }

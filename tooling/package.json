@@ -6,6 +6,7 @@
   "scripts": {
     "migrate:global": "tsx scripts/migrate-global-d1.ts",
     "migrate:tenant": "tsx scripts/migrate-tenant-d1.ts",
+    "provision:platform": "tsx scripts/provision-platform-cloudflare.ts",
     "seed:platform": "tsx scripts/seed-platform.ts",
     "seed:tenant": "tsx scripts/seed-tenant.ts",
     "provision:tenant": "tsx scripts/provision-tenant.ts",
@@ -13,7 +14,8 @@
   },
   "dependencies": {
     "@arch/db-schema": "workspace:*",
-    "drizzle-orm": "^0.39.0",
+    "@arch/infrastructure-sdk": "workspace:*",
+    "drizzle-orm": "^0.41.0",
     "ulid": "^2.3.0"
   },
   "devDependencies": {

@@ -87,7 +87,10 @@ export namespace OpenAPIV3 {
   export interface SchemaObject {
     type?: string;
     format?: string;
+    pattern?: string;
     enum?: unknown[];
+    minItems?: number;
+    allOf?: Array<SchemaObject | ReferenceObject>;
     items?: SchemaObject | ReferenceObject;
     properties?: Record<string, SchemaObject | ReferenceObject>;
     required?: string[];

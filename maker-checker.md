@@ -38,7 +38,7 @@ type PolicyScope = typeof POLICY_SCOPES[keyof typeof POLICY_SCOPES];
 **Tenant-scope flows:**
 - Stored in the **tenant's D1 database** (as in the original design).
 - Policies defined by tenant admins.
-- Approvers resolved from within the tenant's Clerk Organization.
+- Approvers resolved from the tenant membership graph managed by Better Auth and the global identity store.
 - Audit trails written to the tenant's audit log.
 - Use the tenant's Sentry DSN.
 
@@ -178,7 +178,7 @@ type StepUpMethod =
   | "SMS_OTP"         // SMS-delivered one-time code
   | "EMAIL_OTP"       // Email-delivered one-time code
   | "WEBAUTHN"        // Hardware key / passkey / biometric
-  | "CLERK_MFA";      // Delegate to Clerk's MFA verification flow
+  | "AUTH_SESSION_STEP_UP";      // Delegate to Better Auth session assurance checks
 
 interface StepUpAuthConfig {
   readonly method: StepUpMethod;
@@ -246,14 +246,14 @@ This chain means: finance manager approves → finance manager proves identity v
    - SMS_OTP / EMAIL_OTP: generate random code, store hash in DO SQLite,
      publish SendStepUpCode event to notification queue.
    - WEBAUTHN: generate challenge bytes, store in DO, return to client.
-   - CLERK_MFA: return a Clerk step-up session token requirement.
+  - AUTH_SESSION_STEP_UP: return a Better Auth session step-up requirement.
 5. Client submits verification response to:
    POST /approvals/requests/:requestId/steps/:stepId/verify
 6. DO validates:
-   - TOTP: verify code against user's TOTP secret (stored in Clerk or platform DB).
+  - TOTP: verify code against the user's TOTP secret (stored in Better Auth or platform DB).
    - SMS_OTP / EMAIL_OTP: compare hash of submitted code with stored hash.
    - WEBAUTHN: verify assertion against stored public key.
-   - CLERK_MFA: verify Clerk session has elevated assurance level.
+  - AUTH_SESSION_STEP_UP: verify the Better Auth session has elevated assurance level.
 7. On success: step status → VERIFIED, chain advances.
 8. On failure: increment attempt counter.
    - If attempts exhausted: step status → FAILED, flow → REJECTED.
@@ -269,7 +269,7 @@ Body:
   | { method: "SMS_OTP"; code: string }
   | { method: "EMAIL_OTP"; code: string }
   | { method: "WEBAUTHN"; assertion: WebAuthnAssertion }
-  | { method: "CLERK_MFA"; sessionToken: string }
+  | { method: "AUTH_SESSION_STEP_UP"; sessionToken: string }
 
 POST /approvals/requests/:requestId/steps/:stepId/resend
   (for SMS_OTP and EMAIL_OTP only — generates new code, resets expiry)

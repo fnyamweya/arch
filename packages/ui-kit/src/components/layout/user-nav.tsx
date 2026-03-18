@@ -13,8 +13,8 @@ import {
 } from "../ui/dropdown-menu";
 import { UserAvatarProfile } from "./user-avatar-profile";
 import { IconLogout, IconUserCircle, IconSettings, IconCreditCard } from "@tabler/icons-react";
-import { SignOutButton, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { authClient } from "../auth/auth-client";
 
 interface UserNavProps {
     readonly profilePath?: string;
@@ -29,24 +29,44 @@ export function UserNav({
     settingsPath,
     signInPath = "/sign-in",
 }: UserNavProps) {
-    const { user } = useUser();
+    const { data: session } = authClient.useSession();
     const router = useRouter();
+    const [isSigningOut, setIsSigningOut] = React.useState(false);
+
+    const user = session?.user;
 
     if (!user) return null;
+
+    const handleSignOut = async () => {
+        setIsSigningOut(true);
+        try {
+            await authClient.signOut();
+        } finally {
+            router.push(signInPath);
+            router.refresh();
+            setIsSigningOut(false);
+        }
+    };
+
+    const avatarUser = {
+        imageUrl: user.image ?? undefined,
+        fullName: user.name ?? null,
+        emailAddresses: user.email ? [{ emailAddress: user.email }] : [],
+    };
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <UserAvatarProfile user={user} />
+                    <UserAvatarProfile user={avatarUser} />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" sideOffset={10} forceMount>
                 <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                        <p className="text-sm leading-none font-medium">{user.fullName}</p>
+                        <p className="text-sm leading-none font-medium">{user.name}</p>
                         <p className="text-muted-foreground text-xs leading-none">
-                            {user.emailAddresses[0]?.emailAddress}
+                            {user.email}
                         </p>
                     </div>
                 </DropdownMenuLabel>
@@ -72,9 +92,9 @@ export function UserNav({
                     )}
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut} disabled={isSigningOut}>
                     <IconLogout className="mr-2 h-4 w-4" />
-                    <SignOutButton redirectUrl={signInPath} />
+                    {isSigningOut ? "Signing out..." : "Sign out"}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

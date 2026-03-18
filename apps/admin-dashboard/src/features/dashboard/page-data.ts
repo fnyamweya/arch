@@ -100,7 +100,7 @@ export const adminOverviewPage = {
         metric("Live workspaces", "184", "+8.2%", "up", "Pipeline velocity improved", "New launches over the last two sprints"),
         metric("Secure sign-ins", "99.98%", "+0.4%", "up", "Authentication edge remains stable", "Global availability across branded domains"),
         metric("Ledger batches", "12.4k", "+6.1%", "up", "Settlement jobs cleared faster", "Background accounting flows in the last 14 days"),
-        metric("Gross throughput", "$8.7M", "+3.9%", "up", "Healthy transaction expansion", "Net platform movement this month"),
+        metric("Gross throughput", "KES 8.7M", "+3.9%", "up", "Healthy transaction expansion", "Net platform movement this month"),
     ],
     barChart: {
         title: "Control plane volume",
@@ -150,7 +150,7 @@ export const adminAnalyticsPage = {
         rows: [
             row("New tenant launches", "Provisioning and onboarding readiness", "7-day rolling", "+11.2%", "Healthy", "positive"),
             row("Custom domain adoption", "Branded auth and storefront routing", "30-day rolling", "+6.4%", "Healthy", "positive"),
-            row("Clerk key rotation", "Credential refresh coverage", "Current sprint", "94% complete", "Watching", "warning"),
+            row("Session policy hardening", "Credential and session controls", "Current sprint", "94% complete", "Watching", "warning"),
             row("Finance reconciliation", "Matched vs pending entries", "Month to date", "98.6% matched", "Healthy", "positive"),
         ],
         footer: "Signals update nightly and prioritize surfaces with tenant-facing or financial impact.",
@@ -159,7 +159,7 @@ export const adminAnalyticsPage = {
         title: "Watchlist",
         description: "Items that merit explicit operator attention before the next release window.",
         items: [
-            insight("Onboarding bottleneck", "2 queues", "Manual DNS review is the main remaining delay.", "warning"),
+            insight("Onboarding bottleneck", "2 queues", "Queue fan-out is the main remaining delay after automated DNS and worker-domain provisioning.", "warning"),
             insight("Auth edge saturation", "Low", "Peak request density remains well below alert thresholds.", "positive"),
             insight("Ledger drift", "0.7%", "Variance is isolated to delayed provider settlements.", "neutral"),
         ],
@@ -235,7 +235,7 @@ export const adminLedgerAccountsPage = {
     tabs: workspaceTabs,
     metrics: [
         metric("Open accounts", "246", "+1.6%", "up", "New segments are being added carefully", "Includes control, reserve, and clearing accounts"),
-        metric("Reconciled balance", "$24.1M", "+2.8%", "up", "Cash position continues to expand", "Combined cleared and reserve balances"),
+        metric("Reconciled balance", "KES 24.1M", "+2.8%", "up", "Cash position continues to expand", "Combined cleared and reserve balances"),
         metric("Dormant accounts", "12", "-14.3%", "down", "Unused accounts are being retired", "Accounts without movement over two cycles"),
         metric("Reserve utilization", "71%", "+2.1%", "up", "Risk buffers remain intentionally funded", "Protection coverage for contested flows"),
     ],
@@ -244,10 +244,10 @@ export const adminLedgerAccountsPage = {
         description: "Balance-bearing accounts with the most material movement or operator attention.",
         columns: ["Account", "Owner", "Balance shift", "State"],
         rows: [
-            row("Marketplace clearing", "Primary order clearing ledger", "Treasury", "+$1.3M", "Healthy", "positive"),
-            row("Refund reserve", "Refund and dispute protection buffer", "Risk", "+$184k", "Stable", "neutral"),
-            row("Payout suspense", "Awaiting provider confirmation", "Finance ops", "-$63k", "Watching", "warning"),
-            row("FX adjustment", "Cross-currency balancing account", "Treasury", "+$22k", "Healthy", "positive"),
+            row("Marketplace clearing", "Primary order clearing ledger", "Treasury", "+KES 1.3M", "Healthy", "positive"),
+            row("Refund reserve", "Refund and dispute protection buffer", "Risk", "+KES 184k", "Stable", "neutral"),
+            row("Payout suspense", "Awaiting provider confirmation", "Finance ops", "-KES 63k", "Watching", "warning"),
+            row("FX adjustment", "Cross-currency balancing account", "Treasury", "+KES 22k", "Healthy", "positive"),
         ],
         footer: "High-movement accounts are monitored first because they have the greatest downstream tenant reporting impact.",
     },
@@ -411,7 +411,7 @@ export const adminSettingsPage = {
         description: "High-signal items the team validates before changing global defaults.",
         items: [
             insight("Rollback path documented", "Required", "Defaults should be reversible without tenant downtime.", "neutral"),
-            insight("Auth migration tested", "Required", "Validate tenant-specific Clerk overrides before rollout.", "neutral"),
+            insight("Auth migration tested", "Required", "Validate tenant-specific Better Auth settings before rollout.", "neutral"),
             insight("Audit event coverage verified", "Required", "Every change should emit an attributable operator event.", "neutral"),
         ],
     },
@@ -446,7 +446,7 @@ export const adminTenantsPage = {
         description: "Which tenants need the next operator action and why.",
         items: [
             insight("DNS coordination", "2 launches", "Two managed tenants still depend on external registrar updates.", "warning"),
-            insight("Auth readiness", "Strong", "Most managed workspaces now have tenant-specific Clerk configuration.", "positive"),
+            insight("Auth readiness", "Strong", "Most managed workspaces now have platform-managed Better Auth coverage.", "positive"),
             insight("Finance setup", "1 review", "A single tenant is waiting on reserve policy sign-off.", "neutral"),
         ],
     },
@@ -459,7 +459,7 @@ export const adminCreateTenantPage = {
     metrics: [
         metric("Average launch time", "3.8 days", "-8.5%", "down", "Time to first live domain improved", "Measured from request intake to production host"),
         metric("Baseline modules", "11", "+2", "up", "More defaults now ship automatically", "Operational capabilities applied at workspace creation"),
-        metric("Auth readiness", "96%", "+1.1%", "up", "New workspaces usually launch with branded auth", "Tenant-specific Clerk setup before go-live"),
+        metric("Auth readiness", "96%", "+1.1%", "up", "New workspaces usually launch with branded auth", "Platform-managed Better Auth setup before go-live"),
         metric("Manual steps", "4", "-20%", "down", "Provisioning burden is shrinking", "Average human approvals required per launch"),
     ],
     form: {
@@ -559,7 +559,7 @@ export function createTenantDetailPage(tenantId: string): DashboardTablePageTemp
             columns: ["Checkpoint", "Owner", "Variance", "State"],
             rows: [
                 row("Routing health", "Canonical and secondary hosts", "Platform", "No drift detected", "Healthy", "positive"),
-                row("Identity setup", "Clerk configuration and webhook trust", "Security", "1 follow-up item", "Watching", "warning"),
+                row("Identity setup", "Better Auth configuration and webhook trust", "Security", "1 follow-up item", "Watching", "warning"),
                 row("Settlement readiness", "Ledger and payout configuration", "Finance", "Within baseline", "Stable", "neutral"),
                 row("Feature rollout", "Current managed capability set", "Platform", "Near baseline parity", "Healthy", "positive"),
             ],
@@ -713,7 +713,7 @@ export function createTenantInfrastructurePage(tenantId: string): DashboardTable
             columns: ["Surface", "Owner", "Variance", "State"],
             rows: [
                 row("Storefront runtime", "Customer-facing web traffic", "Platform", "Within target latency", "Healthy", "positive"),
-                row("Auth edge", "Clerk and tenant proxy traffic", "Security", "Stable", "Healthy", "positive"),
+                row("Auth edge", "Better Auth and tenant proxy traffic", "Security", "Stable", "Healthy", "positive"),
                 row("Background workers", "Content and ledger jobs", "Platform", "One queue spike", "Watching", "warning"),
                 row("Observability hooks", "Logs, traces, and alerts", "Platform", "Nominal", "Stable", "neutral"),
             ],
